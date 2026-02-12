@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="de">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Qumea Plugin</title>
+    <!-- Favicon-->
+    <link rel="icon" href="/static/assets/icons/favicon.ico" type="image/x-icon">
+
+    <!-- Bootstrap 5 CSS -->
+    <link href="/static/libs/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Bootstrap icons -->
+    <link rel="stylesheet" href="/static/libs/css/bootstrap-icons.css">
+    
+    <!-- DataTables + Bootstrap 5 + Responsive + jQuery (kombinierte Version) -->
+    <link rel="stylesheet" href="/static/libs/css/datatables.min.css">
+    <script src="/static/libs/js/datatables.min.js"></script>
+
+    <!-- Google Font-->
+    <link href="https://fonts.googleapis.com/css2?family=Google+Sans+Code:ital,wght@0,300..800;1,300..800&family=Roboto:ital,wght@0,100..900;1,100..900&family=Sansation:ital,wght@0,300;0,400;0,700;1,300;1,400;1,700&display=swap" rel="stylesheet">
+     
+    <!-- Eigene Styles -->
+    <link rel="stylesheet" href="/static/style.css">
+    <link rel="stylesheet" href="/static/libs/css/fonts.css">
+
+</head>
+<body class="bg-body">
+
+  <!-- Burger rechts oben (nur mobil) -->
+  <button
+    class="btn btn-outline-secondary d-lg-none position-fixed top-0 end-0 m-3 z-3"
+    type="button"
+    data-bs-toggle="offcanvas"
+    data-bs-target="#sidebar"
+    aria-controls="sidebar"
+    aria-label="Menü öffnen">
+    <span class="navbar-toggler-ico"><img src="/static/assets/icons/list-task.svg" alt="Navigation" style="width:30px;height:30px" a></span>
+  </button>
+
+  <!-- Sidebar -->
+  <aside id="sidebar" class="offcanvas offcanvas-start offcanvas-lg bg-body-tertiary" tabindex="-1">
+    <div class="offcanvas-header d-lg-none">
+      <!-- <h5 class="offcanvas-title">Menü</h5> -->
+      <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Schließen"></button>
+    </div>
+
+    <div class="offcanvas-body d-flex flex-column p-0 vh-100">
+      <div class="p-4 border-bottom">
+        <img src="/static/assets/img/axe-logo.png" alt="Navigation" class="sidebar-logo img-fluid">
+      </div>
+
+      <nav class="flex-grow-1 d-flex flex-column p-3">
+        <ul class="nav nav-pills flex-column gap-1">
+          <li class="nav-item">
+            <a class="nav-link active" href="#" data-page="dashboard.html">Dashboard</a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link" href="#" data-page="settings.html">Settings</a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link" data-bs-toggle="collapse" href="#administrationSubmenu" role="button" aria-expanded="false" aria-controls="administrationSubmenu">
+              Administration
+            </a>
+            <div class="collapse ps-3" id="administrationSubmenu">
+              <ul class="nav flex-column">
+                <li class="nav-item">
+                  <a class="nav-link" href="#" data-page="rooms.html">Rooms</a>
+                </li>
+              </ul>
+            </div>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link" data-bs-toggle="collapse" href="#maintenanceSubmenu" role="button" aria-expanded="false" aria-controls="maintenanceSubmenu">
+              Maintenance
+            </a>
+            <div class="collapse ps-3" id="maintenanceSubmenu">
+              <ul class="nav flex-column">
+                <li class="nav-item">
+                  <a class="nav-link" href="#" data-page="backups.html">Backups</a>
+                </li>
+                <li class="nav-item">
+                  <a class="nav-link" href="#" data-page="logs.html">Logs</a>
+                </li>
+                <li class="nav-item">
+                  <a class="nav-link" href="#" data-page="system.html">System</a>
+                </li>
+              </ul>
+            </div>
+          </li>
+    
+        </ul>
+        <ul class="nav nav-pills flex-column gap-1 flex-grow-1">
+        </ul>
+        <div class="mt-auto pt-2">
+          <a href="#logout" class="btn btn-danger w-100" onclick="logout()">Logout</a>
+        </div>
+      </nav>
+
+      
+    </div>
+  </aside>
+
+
+  <!-- Main Content -->
+  <main class="content">
+    <div id="main-content" class="container-fluid py-4">
+      <!-- Startinhalt wird per JS geladen -->
+      <noscript>Bitte JavaScript aktivieren.</noscript>
+    </div>
+  </main>
+
+  <!-- Bootstrap 5 JS Bundle -->
+  <script src="/static/libs/js/bootstrap.bundle.min.js"></script>
+
+  <!-- Eigene App-Logik -->
+  <script src="/static/app.js"></script>
+</body>
+</html>

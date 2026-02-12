@@ -1,0 +1,142 @@
+<h1 class="h3 mb-3">Settings</h1>
+<div class="container-fluid">
+  <section>
+    </div>
+    <div class="row">
+      <div class="col-xl-12 col-md-12 mb-4">
+        <div class="card">
+          <div class="card-header">
+            <h4>Ofelia 3CX Settings</h4>
+            <p class="mb-0">Einstellungen für Ofelia 3CX und den Service Allgemein</p>
+          </div>
+          <div class="card-body">
+            <div class="d-flex justify-content-between p-md-1">
+              <div class="d-flex flex-row">
+                <div class="container mt-3">
+                  <div class="row mb-2 align-items-center">
+                    <h5>Allgemein</h5>
+                  </div>
+
+                  <div class="row mb-2 align-items-center">
+                    <div class="col-md-6">
+                      <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" id="ofelia_3cx_service_enabled" name="darkmode" value="no" unchecked>
+                        <label class="form-check-label" for="ofelia_3cx_service_enabled">Deaktiviert</label>
+                      </div>
+                    </div>
+                    <div class="col-md-6 text-muted small">
+                      Service Aktivieren / Deaktivieren
+                    </div>
+                  </div>
+                  <div class="row mb-2 align-items-center">
+                    <div class="col-md-6">
+                      <input type="text" class="form-control" id="ofelia_3cx_service_name" placeholder="ofelia_3cx" readonly>
+                    </div>
+                    <div class="col-md-6 text-muted small">
+                      Service Name
+                    </div>
+                  </div>
+                  <div class="row mb-2 align-items-center">
+                    <div class="col-md-6">
+                      <input type="text" class="form-control" id="ofelia_3cx_service_type" placeholder="ofelia_3cx" readonly>
+                    </div>
+                    <div class="col-md-6 text-muted small">
+                      Service Typ
+                    </div>
+                  </div>
+                  
+
+
+                  <div class="row mb-2 align-items-center">
+                    <div class="col-md-6">
+                      <input type="number" class="form-control" id="poll_intervall_seconds" placeholder="Sekunden">
+                    </div>
+                    <div class="col-md-6 text-muted small">
+                      Sekunden: Polling Intervall in Sekunden für die Abfrage der Medien von Ofelia
+                    </div>
+                  </div>
+                  <div class="row mb-2 align-items-center">
+                    <div class="col-md-6">
+                      <input type="number" class="form-control" id="timeout_seconds" placeholder="Sekunden">
+                    </div>
+                    <div class="col-md-6 text-muted small">
+                      Sekunden: Timeout in Sekunden für die API Requests an Ofelia und 3CX
+                    </div>
+                  </div>
+                  <div class="row mb-2 align-items-center">
+                    <h5>Ofelia</h5>
+                  </div>
+                  <div class="row mb-2 align-items-center">
+                    <div class="col-md-6">
+                      <input type="text" class="form-control" id="ofelia_base_url" placeholder="https://ofelia.example.com">
+                    </div>
+                    <div class="col-md-6 text-muted small">
+                      Basis URL des Ofelia Servers
+                    </div>
+                  </div>
+                  <div class="row mb-2 align-items-center">
+                    <div class="col-md-6">
+                      <input type="text" class="form-control" id="ofelia_number_regex" placeholder="Regex">
+                    </div>
+                    <div class="col-md-6 text-muted small">
+                      Regex für die Nummer aus dem Ofelia Media Name
+                    </div>
+                  </div>
+                  <div class="row mb-2 align-items-center">
+                    <div class="col-md-6">
+                      <input type="text" class="form-control" id="ofelia_medias_path" placeholder="/api/medias?...">
+                    </div>
+                    <div class="col-md-6 text-muted small">
+                      Pfad der Ofelia API für die Abfrage der Medien
+                    </div>
+                  </div>
+                  <div class="row mb-2 align-items-center">
+                    <h5>3CX</h5>
+                  </div>
+                  <div class="row mb-2 align-items-center">
+                    <div class="col-md-6">
+                      <input type="text" class="form-control" id="threecx_base_url" placeholder="https://3cx.example.com">
+                    </div>
+                    <div class="col-md-6 text-muted small">
+                      3CX Management Console URL
+                    </div>
+                  </div>
+                  <div class="row mb-2 align-items-center">
+                    <div class="col-md-2">
+                      <button class="btn btn-success" id="save_ofelia_3cx_settings" onclick="save_ofelia_3cx_settings()">Speichern</button>
+                    </div>
+                    <div class="col-md-2">
+                      <button class="btn btn-secondary" id="get_ofelia_3cx_settings">Neu Laden</button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="col-xl-12 col-md-12 mb-4">
+        <div class="card">
+          <div class="card-header">
+            <h4>Unite Innovaphone Settings</h4>
+            <p class="mb-0">Einstellungen für Unite Innovpahone und den Service Allgemein</p>
+          </div>
+          <div class="card-body">
+            <div class="d-flex justify-content-between p-md-1">
+              <div class="d-flex flex-row">
+                <div class="align-self-center">
+                </div>
+                <div>
+                  <p class="mb-0"></p>
+                </div>
+              </div>
+              <div class="align-self-center">
+                <h2 class="h1 mb-0"></h2>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+</div>

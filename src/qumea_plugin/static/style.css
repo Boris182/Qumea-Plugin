@@ -1,0 +1,93 @@
+/* ===========================
+   Variablen & Basis
+=========================== */
+:root {
+  --sidebar-width: 270px;
+  --sidebar-gap: 16px;                 /* Abstand zum Seitenrand */
+  --sidebar-radius: 16px;              /* Rundung der Sidebar-Card */
+  --sidebar-card-bg: rgba(255,255,255,0.85);
+  --sidebar-card-border: rgba(255,255,255,0.6);
+  --bs-body-font-family: 'Roboto', sans-serif;
+}
+
+html, body {
+  height: 100%;
+}
+
+/* Vollflächiger Seitenhintergrund (Gradient + Bild) */
+body {
+  background: linear-gradient(225deg, #e94a54, #9051e4);
+  /* Falls du kein Bild willst, nimm nur den Gradient:
+     background: linear-gradient(135deg, #4ccd4f, #549fe9);
+  */
+  overflow: auto; /* wichtig für Desktop-Layout */
+  font-family: var(--bs-body-font-family);
+}
+
+
+/* ===========================
+   Sidebar als Card (Desktop)
+=========================== */
+@media (min-width: 992px) {
+  #sidebar.offcanvas-lg {
+    position: fixed;
+    top: var(--sidebar-gap);
+    left: var(--sidebar-gap);
+    bottom: var(--sidebar-gap);
+    width: var(--sidebar-width);
+    transform: none !important;
+    visibility: visible !important;
+
+    /* Card-Look */
+    background: var(--sidebar-card-bg) !important;
+    border-radius: var(--sidebar-radius);
+    box-shadow: 0 20px 50px rgba(0,0,0,0.25);
+    backdrop-filter: blur(8px);
+    border: 1px solid var(--sidebar-card-border);
+    overflow: hidden; /* runde Ecken für Inhalt erzwingen */
+  }
+
+  /* Main Content rückt nach rechts + bleibt transparent */
+  .content {
+    margin-left: calc(var(--sidebar-width) + (var(--sidebar-gap) * 2));
+    min-height: 100vh;
+    background: transparent !important;
+  }
+
+  
+}
+
+/* ===========================
+   Nav-Pills (Sidebar Menü)
+=========================== */
+.nav-pills .nav-link {
+  color: #000000 !important;
+  background-color: rgba(255, 255, 255, 0.9) !important;
+  border-radius: 10px;
+}
+
+.nav-pills .nav-link:hover {
+  color: #000000 !important;
+  background-color: rgba(216, 216, 216, 0.9) !important;
+}
+
+.nav-pills .nav-link.active {
+  color: #000 !important;
+  background-color: rgb(216, 216, 216) !important;
+}
+
+.nav-pills .nav-link.active:hover {
+  background-color: rgb(133, 132, 132) !important;
+}
+
+/* ===========================
+   Inhalt / Hilfsstyles
+=========================== */
+#main-content .card {
+  height: 100%;
+}
+
+.sidebar-logo {
+  max-width: 80%;
+  padding: 10px;
+}
