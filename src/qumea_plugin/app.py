@@ -7,12 +7,15 @@ from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import RedirectResponse, FileResponse
 from contextlib import asynccontextmanager
-from .routers import public_routes, auth_routes, backup_routes, maintenance_routes
+from .routers import public_routes, auth_routes, backup_routes, maintenance_routes, service_routes
 from .logging_conf import setup_logging
 from .config import get_settings
-from .db.database import engine, Base
+from .db.database import engine, Base, SessionLocal
 from .db import models
 from .ws import logs_socket
+from .services.runtime.context import RuntimeContext
+from .services.runtime.manager import ServiceManager
+from .services.http.client import create_http_client
 
 # Logger anlegen für Applikation
 logger = logging.getLogger(__name__)
@@ -31,14 +34,28 @@ def create_app() -> FastAPI:
     @asynccontextmanager
     async def lifespan(app: FastAPI):
         logger.info("Startup: %s v%s", settings.app_name, __version__)
-        # JWT Secret erzeugen, bleibt solange Porgramm läuft.
         app.state.jwt_secret = secrets.token_urlsafe(64)
+
         Base.metadata.create_all(bind=engine)
-        yield
-        logger.info("Shutdown: bye")
-        # Beispiel: Cleanup:
-        # await app.state.db.close()
-        # await app.state.nats.close()
+
+        http = create_http_client()
+        ctx = RuntimeContext(SessionLocal=SessionLocal, http=http)
+        app.state.service_manager = ServiceManager(ctx)
+
+        try:
+            yield
+        finally:
+            logger.info("Shutdown: bye")
+
+            try:
+                await app.state.service_manager.stop()
+            except Exception:
+                logger.exception("Error while stopping service manager")
+
+            try:
+                await http.aclose()
+            except Exception:
+                logger.exception("Error while closing http client")
 
     app = FastAPI(
         title=settings.app_name,
@@ -70,6 +87,7 @@ def create_app() -> FastAPI:
     app.include_router(logs_socket.router)
     app.include_router(backup_routes.router)
     app.include_router(maintenance_routes.router)
+    app.include_router(service_routes.router)
 
     return app
 
