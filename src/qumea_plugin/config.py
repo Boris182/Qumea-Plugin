@@ -31,6 +31,12 @@ class Settings(BaseSettings):
     jwt_alg: str = "HS256"
     jwt_expire_min: int = 60
 
+    # ---- Secrets via Environment ----
+    mqtt_username: str | None = None
+    mqtt_password: str | None = None
+    ssh_username: str | None = None
+    ssh_password: str | None = None
+
 
 def get_settings() -> Settings:
     return Settings()

@@ -1,4 +1,5 @@
 import os
+import json
 import logging
 import secrets
 from pathlib import Path
@@ -7,15 +8,17 @@ from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import RedirectResponse, FileResponse
 from contextlib import asynccontextmanager
-from .routers import public_routes, auth_routes, backup_routes, maintenance_routes, service_routes
+from .routers import public_routes, auth_routes, backup_routes, maintenance_routes, service_routes, config_routes
 from .logging_conf import setup_logging
 from .config import get_settings
 from .db.database import engine, Base, SessionLocal
 from .db import models
+from .db.crud import config as config_crud
 from .ws import logs_socket
 from .services.runtime.context import RuntimeContext
 from .services.runtime.manager import ServiceManager
 from .services.http.client import create_http_client
+from .services.config_defaults import DEFAULT_HTTP_CONFIG, merge_with_defaults
 
 # Logger anlegen für Applikation
 logger = logging.getLogger(__name__)
@@ -38,8 +41,22 @@ def create_app() -> FastAPI:
 
         Base.metadata.create_all(bind=engine)
 
-        http = create_http_client()
-        ctx = RuntimeContext(SessionLocal=SessionLocal, http=http)
+        raw_http_cfg = None
+        db = SessionLocal()
+        try:
+            raw_http_cfg = config_crud.get_value(db, "http")
+        finally:
+            db.close()
+
+        http_cfg = DEFAULT_HTTP_CONFIG.copy()
+        if raw_http_cfg:
+            try:
+                http_cfg = merge_with_defaults(json.loads(raw_http_cfg), DEFAULT_HTTP_CONFIG)
+            except json.JSONDecodeError:
+                http_cfg = DEFAULT_HTTP_CONFIG.copy()
+
+        http = create_http_client(http_cfg)
+        ctx = RuntimeContext(SessionLocal=SessionLocal, http=http, settings=settings)
         app.state.service_manager = ServiceManager(ctx)
 
         try:
@@ -87,6 +104,7 @@ def create_app() -> FastAPI:
     app.include_router(logs_socket.router)
     app.include_router(backup_routes.router)
     app.include_router(maintenance_routes.router)
+    app.include_router(config_routes.router)
     app.include_router(service_routes.router)
 
     return app

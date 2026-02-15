@@ -1,5 +1,6 @@
 # src/qumea_plugin/services/runtime/manager.py
 import asyncio
+import json
 import time
 from dataclasses import dataclass
 from typing import Optional
@@ -9,6 +10,13 @@ from ..workflow.engine import WorkflowEngine
 from ..workflow.stages.http_get import HttpGetStage
 from ..mqtt.client import MqttWorker, MqttConfig
 from ..ssh.listener import SshListener, SshConfig
+from ..config_defaults import (
+    DEFAULT_MQTT_CONFIG,
+    DEFAULT_SSH_CONFIG,
+    merge_with_defaults,
+)
+from ...db.crud import config as config_crud
+from ...db.models import Room
 
 @dataclass
 class ServiceStatus:
@@ -36,6 +44,23 @@ class ServiceManager:
             ]
         )
 
+    def _load_config(self, key: str, default: dict) -> dict:
+        db = self.ctx.SessionLocal()
+        try:
+            raw = config_crud.get_value(db, key)
+        finally:
+            db.close()
+
+        if not raw:
+            return default.copy()
+
+        try:
+            parsed = json.loads(raw)
+        except json.JSONDecodeError:
+            parsed = {}
+
+        return merge_with_defaults(parsed, default)
+
     def _url_builder(self, ctx: RuntimeContext, event: dict) -> str | None:
         """
         Hier: event auswerten + rooms aus SQLite laden + URL bauen.
@@ -46,13 +71,12 @@ class ServiceManager:
         if not room_id:
             return None
 
-        # DB lookup Beispiel (pseudo):
         db = ctx.SessionLocal()
         try:
-            # TODO: rooms query
-            # room = db.query(Room).filter(Room.id==room_id).first()
-            # return room.action_url
-            return f"http://127.0.0.1:8181/action?room_id={room_id}"
+            room = db.query(Room).filter(Room.id == room_id).first()
+            if not room:
+                return None
+            return f"http://{room.ascom_rc_ip}/action?device_id={room.ascom_device_id}&room_id={room.id}"
         finally:
             db.close()
 
@@ -60,23 +84,17 @@ class ServiceManager:
         if self.status.running:
             return
 
-        # TODO: Config aus DB lesen (mqtt host/topic, ssh, urls, ...)
-        mqtt_cfg = MqttConfig(
-            host="127.0.0.1",
-            port=1883,
-            username=None,
-            password=None,
-            subscribe_topic="qumea/events",
-            keepalive_in_topic="qumea/broker/keepalive",
-            keepalive_out_topic="qumea/plugin/keepalive",
-        )
-        ssh_cfg = SshConfig(
-            host="127.0.0.1",
-            port=22,
-            username="user",
-            password=None,
-            command="tail -f /var/log/syslog",
-        )
+        settings = self.ctx.settings
+        mqtt_dict = self._load_config("mqtt", DEFAULT_MQTT_CONFIG)
+        mqtt_dict["username"] = settings.mqtt_username
+        mqtt_dict["password"] = settings.mqtt_password
+
+        ssh_dict = self._load_config("ssh", DEFAULT_SSH_CONFIG)
+        ssh_dict["username"] = settings.ssh_username or "user"
+        ssh_dict["password"] = settings.ssh_password
+
+        mqtt_cfg = MqttConfig(**mqtt_dict)
+        ssh_cfg = SshConfig(**ssh_dict)
 
         self._mqtt = MqttWorker(mqtt_cfg, self.event_queue, self.ka_queue)
         self._ssh = SshListener(ssh_cfg, self.event_queue)
