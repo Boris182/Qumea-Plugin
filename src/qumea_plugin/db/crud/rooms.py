@@ -14,10 +14,9 @@ def get_room_by_name(db: Session, name: str) -> Room | None:
     return db.query(Room).filter(Room.room_name == name).first()
 
 
-def create_room(db: Session, *, room_name: str, ascom_rc_ip: str, ascom_device_id: str) -> Room:
+def create_room(db: Session, *, room_name: str, ascom_device_id: str) -> Room:
     room = Room(
         room_name=room_name,
-        ascom_rc_ip=ascom_rc_ip,
         ascom_device_id=ascom_device_id,
     )
     db.add(room)
@@ -31,7 +30,6 @@ def update_room(
     room_id: int,
     *,
     room_name: str | None = None,
-    ascom_rc_ip: str | None = None,
     ascom_device_id: str | None = None,
 ) -> Room | None:
     room = get_room(db, room_id)
@@ -40,8 +38,6 @@ def update_room(
 
     if room_name is not None:
         room.room_name = room_name
-    if ascom_rc_ip is not None:
-        room.ascom_rc_ip = ascom_rc_ip
     if ascom_device_id is not None:
         room.ascom_device_id = ascom_device_id
 

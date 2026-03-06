@@ -1,7 +1,7 @@
 
 function restartSystem() {
 
-  authFetch(`/restart`, {
+  authFetch(`/api/maintenance/restart`, {
     method: "POST", // oder PATCH, je nach API
   })
     .then(res => {

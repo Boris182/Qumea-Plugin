@@ -4,7 +4,7 @@
 function getLogs() {
     const logBox = document.getElementById("logOutput");
 const token = localStorage.getItem("auth_token");
-    fetch("/logs", {
+    fetch("/api/maintenance/logs", {
   method: "GET",
   headers: {
     "Authorization": "Bearer " + token
@@ -43,7 +43,7 @@ const token = localStorage.getItem("auth_token");
 function updateLogLevel() {
   const selectedLevel = document.getElementById("logLevelInput").value;
 
-  authFetch(`/api/settings/setLogLevel/${selectedLevel}`) 
+  authFetch(`/api/maintenance/setLogLevel/${selectedLevel}`) 
     .then(res => {
       if (!res.ok) throw new Error("Fehler beim Setzen des Log-Levels");
       return res.json();
@@ -58,7 +58,7 @@ function updateLogLevel() {
 }
 function getlogLevel() {
 
-  authFetch(`/api/settings/getLogLevel`, {
+  authFetch(`/api/maintenance/getLogLevel`, {
     method: "GET", // oder PATCH, je nach API
   })
     .then(res => {
@@ -76,7 +76,7 @@ function getlogLevel() {
 }
 
 function downloadLogs() {
-  authFetch('/logsDownload', {
+  authFetch('/api/maintenance/logsDownload', {
     method: 'GET',
   }).then(response => {
     if (!response.ok) {

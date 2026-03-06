@@ -1,5 +1,5 @@
 function downloadLatestBackup() {
-  authFetch("/api/maintenance/db/download-latest", {
+  authFetch("/api/backups/db/download-latest", {
     method: "GET"
   })
     .then(res => {
@@ -40,7 +40,7 @@ async function downloadBackup() {
     }
 
     // 2. Anfrage an den Server (POST mit JSON-Body)
-    const res = await authFetch("/api/maintenance/backup", {
+    const res = await authFetch("/api/backups/db/backup", {
       method: "POST",
       headers: {
         "Content-Type": "application/json"
@@ -118,7 +118,7 @@ async function restoreBackup() {
   }
 
   try {
-    const res = await authFetch("/api/maintenance/restore", {
+    const res = await authFetch("/api/backups/db/restore", {
       method: "POST",
       body: formData
     });
@@ -139,7 +139,7 @@ async function restoreBackup() {
       throw new Error(msg);
     }
 
-    alert("Datenbank erfolgreich wiederhergestellt. Bitte melden Sie sich erneut an.");
+    alert("Datenbank erfolgreich wiederhergestellt. Bitte System neustarten.");
     // Session sauber schließen und zur Login-Seite
     try { await logout(); } catch {}
     window.location.href = "/static/sites/login.html";
@@ -153,7 +153,7 @@ async function restoreBackup() {
 }
 
 function backupDatabase() {
-  authFetch("/api/maintenance/db/backup", {
+  authFetch("/api/backups/db/backup", {
     method: "GET"
   })
     .then(res => {
@@ -170,7 +170,7 @@ function backupDatabase() {
 }
 
 function getDatabaseStatus() {
-  authFetch("/api/maintenance/db/status", {
+  authFetch("/api/backups/db/status", {
     method: "GET"
   })
     .then(res => {

@@ -1,25 +1,24 @@
 <h1 class="h3 mb-3">Rooms</h1>
-<button type="button" class="btn btn-dark" onclick="get3cxDevices()">
+<button type="button" class="btn btn-dark" onclick="getRooms()">
     Lade Rooms
 </button>
-<button type="button" class="btn btn-success" data-bs-toggle="modal" data-bs-target="#add3cxDeviceModal">
+<button type="button" class="btn btn-success" data-bs-toggle="modal" data-bs-target="#addRoomModal">
     Room hinzufügen
 </button>
 
 <div class="container-fluid mt-3 px-3">
-    <table id="devices3cxTable" class="table table-sm table-striped table-hover align-middle mb-0 w-100">
+    <table id="roomsTable" class="table table-sm table-striped table-hover align-middle mb-0 w-100">
       <thead class="table-light">
         <tr>
             <th>ID</th>
             <th>Room Name</th>
-            <th>Ascom RC IP</th>
             <th>Ascom Device ID</th>
             <th>Aktion</th>
         </tr>
       </thead>
-      <tbody id="devices3cx-table-body">
+      <tbody id="rooms-table-body">
         <tr>
-          <td colspan="6" class="text-center text-muted py-4">Keine Geräte gefunden</td>
+          <td colspan="6" class="text-center text-muted py-4">Keine Räume gefunden</td>
         </tr>
       </tbody>
     </table>
@@ -37,67 +36,51 @@
     <input id="inputCsv" type="file" accept=".csv,text/csv" class="d-none">
 </div>
 
-<!-- Add Device Modal -->
-<div class="modal fade" id="add3cxDeviceModal" tabindex="-1" aria-labelledby="add3cxDeviceModalLabel" aria-hidden="true">
+<!-- Add Room Modal -->
+<div class="modal fade" id="addRoomModal" tabindex="-1" aria-labelledby="addRoomModalLabel" aria-hidden="true">
     <div class="modal-dialog">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title" id="add3cxDeviceModalLabel">Neues 3CX Device hinzufügen</h5>
+                <h5 class="modal-title" id="addRoomModalLabel">Neues Room hinzufügen</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Schließen"></button>
             </div>
             <div class="modal-body">
-                <form id="add3cxDeviceForm">
+                <form id="addRoomForm">
                 <div class="mb-3">
-                    <label for="nadd_umber" class="form-label">Nummer</label>
-                    <input type="text" class="form-control" id="add_number" required>
+                    <label for="add_room_name" class="form-label">Room Name</label>
+                    <input type="text" class="form-control" id="add_room_name" required>
                 </div>
                 <div class="mb-3">
-                    <label for="add_default_first_name" class="form-label">Default First Name</label>
-                    <input type="text" class="form-control" id="add_default_first_name" required>
+                    <label for="add_ascom_device_id" class="form-label">Ascom Device ID</label>
+                    <input type="text" class="form-control" id="add_ascom_device_id" required>
                 </div>
-                <div class="mb-3">
-                    <label for="add_default_last_name" class="form-label">Default Last Name</label>
-                    <input type="text" class="form-control" id="add_default_last_name" required>
-                </div>
-                <div class="mb-3">
-                    <label for="add_default_group_name" class="form-label">Default Group Name</label>
-                    <input type="text" class="form-control" id="add_default_group_name" required>
-                </div>
-                <button type="button" class="btn btn-primary" onclick="submit3cxDevice()">Hinzufügen</button>
+                <button type="button" class="btn btn-primary" onclick="submitRoom()">Hinzufügen</button>
                 </form>
             </div>
         </div>
     </div>
 </div>
-<!-- End Add Device Modal -->
+<!-- End Add Room Modal -->
 
-<!-- Edit Device Modal -->
-<div class="modal fade" id="editDeviceModal" tabindex="-1" aria-labelledby="editDeviceModalLabel" aria-hidden="true">
+<!-- Edit Room Modal -->
+<div class="modal fade" id="editRoomModal" tabindex="-1" aria-labelledby="editRoomModalLabel" aria-hidden="true">
     <div class="modal-dialog">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title" id="edit3cxDeviceModalLabel">Gerät bearbeiten</h5>
+                <h5 class="modal-title" id="editRoomModalLabel">Room bearbeiten</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Schließen"></button>
             </div>
             <div class="modal-body">
                 <input type="hidden" id="edit_id">
                 <div class="mb-3">
-                    <label for="edit_number" class="form-label">Nummer</label>
-                    <input type="text" class="form-control" id="edit_number">
+                    <label for="edit_room_name" class="form-label">Room Name</label>
+                    <input type="text" class="form-control" id="edit_room_name">
                 </div>
                 <div class="mb-3">
-                    <label for="edit_default_first_name" class="form-label">Default First Name</label>
-                    <input type="text" class="form-control" id="edit_default_first_name">
+                    <label for="edit_ascom_device_id" class="form-label">Ascom Device ID</label>
+                    <input type="text" class="form-control" id="edit_ascom_device_id">
                 </div>
-                <div class="mb-3">
-                    <label for="edit_default_last_name" class="form-label">Default Last Name</label>
-                    <input type="text" class="form-control" id="edit_default_last_name">
-                </div>
-                <div class="mb-3">
-                    <label for="edit_default_group_name" class="form-label">Default Group Name</label>
-                    <input type="text" class="form-control" id="edit_default_group_name">
-                </div>
-                <button type="button" class="btn btn-secondary" onclick="submit3cxDeviceEdit()">Änderungen speichern</button>
+                <button type="button" class="btn btn-secondary" onclick="submitRoomEdit()">Änderungen speichern</button>
             </div>
         </div>
     </div>

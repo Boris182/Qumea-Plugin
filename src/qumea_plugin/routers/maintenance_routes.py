@@ -11,18 +11,34 @@ from qumea_plugin.routers.api_models import *
 from qumea_plugin.config import get_settings
 import logging
 import io
-import logging
+
 import os
 import zipfile
 
-router = APIRouter(tags=["Maintenance"])
+router = APIRouter(tags=["Maintenance"], prefix="/api/maintenance")
 settings = get_settings()
 
 # Root logger (global)
 root_logger = logging.getLogger()
 logger = logging.getLogger(__name__)
 
+
+
 LEVELS = {"CRITICAL": 50, "ERROR": 40, "WARNING": 30, "INFO": 20, "DEBUG": 10, "NOTSET": 0}
+
+# Alle Logger auf ein bestimmtes Level setzen (z.B. DEBUG, INFO, WARNING, ERROR, CRITICAL)
+def set_all_loggers_level(numeric: int) -> None:
+    root = logging.getLogger()
+    root.setLevel(numeric)
+
+    for h in root.handlers:
+        h.setLevel(numeric)
+
+    for name, obj in logging.Logger.manager.loggerDict.items():
+        if isinstance(obj, logging.Logger):
+            obj.setLevel(numeric)
+            for h in obj.handlers:
+                h.setLevel(numeric)
 
 # Log-Pfade aus Settings
 LOG_PATH = Path(settings.log_dir)
@@ -72,25 +88,19 @@ def download_logs(user=Depends(get_current_user)):
 
 
 ### Get the Log Level ###
-@router.get("/settings/log-level", description="Return the effective log level of the application.")
+@router.get("/getLogLevel", description="Return the effective log level of the application.")
 def get_log_level(user=Depends(get_current_user)):
     lvl = root_logger.getEffectiveLevel()
     return {"logLevel": logging.getLevelName(lvl)}
 
 ### Set the Log Level ###
-@router.get("/api/settings/setLogLevel/{logLevel}", description="Set the Log Level of the application.")
-def set_log_level(log_level: str, user=Depends(get_current_user)):
-    key = log_level.upper()
+@router.get("/setLogLevel/{logLevel}")
+def set_log_level(logLevel: str, user=Depends(get_current_user)):
+    key = logLevel.upper()
     numeric = LEVELS.get(key)
     if numeric is None:
-        raise HTTPException(status_code=400, detail=f"Ungültiger Log-Level: {log_level}")
+        raise HTTPException(status_code=400, detail=f"Ungültiger Log-Level: {logLevel}")
 
-    # 1) Root-Level setzen (wirkt global)
-    root_logger.setLevel(numeric)
-
-    # 2) Optional: Handler-Level auch setzen (wichtig, wenn Handler strenger filtern)
-    for h in root_logger.handlers:
-        h.setLevel(numeric)
-
-    logger.info("Log level changed to %s", key)
+    set_all_loggers_level(numeric)
+    logging.getLogger(__name__).warning("Log level changed to %s", key)
     return {"logLevel": key}

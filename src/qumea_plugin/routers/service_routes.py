@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Request, HTTPException
 
-router = APIRouter(prefix="/service", tags=["Service"])
+router = APIRouter(prefix="/api/service", tags=["Service"])
 
 @router.post("/start")
 async def start_service(request: Request):

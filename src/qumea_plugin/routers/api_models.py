@@ -30,9 +30,10 @@ class MqttConfigDto(BaseModel):
 
     host: str
     port: int = Field(ge=1, le=65535)
-    subscribe_topic: str
-    keepalive_in_topic: str
-    keepalive_out_topic: str
+    tenant_id: str
+    client_id: str
+    events_to_handle: Optional[Dict[str, bool]] = None
+    integrationId: Optional[str] = None
 
 
 class SshConfigDto(BaseModel):
@@ -40,12 +41,24 @@ class SshConfigDto(BaseModel):
 
     host: str
     port: int = Field(ge=1, le=65535)
-    command: str
 
 
 class HttpClientConfigDto(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    timeout: float = Field(gt=0, default=10.0)
-    base_url: Optional[str] = None
-    verify_ssl: bool = True
+    http_base_url: Optional[str] = None
+    timeout: Optional[float] = None
+
+class ServiceConfigDto(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    run_services_on_startup: Optional[bool] = False
+
+class RoomDto(BaseModel):
+    id: int
+    room_name: str
+    ascom_device_id: str
+
+class addRoomDto(BaseModel):
+    room_name: str
+    ascom_device_id: str

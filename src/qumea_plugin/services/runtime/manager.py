@@ -4,19 +4,21 @@ import json
 import time
 from dataclasses import dataclass
 from typing import Optional
+import logging
 
 from .context import RuntimeContext
-from ..workflow.engine import WorkflowEngine
-from ..workflow.stages.http_get import HttpGetStage
 from ..mqtt.client import MqttWorker, MqttConfig
 from ..ssh.listener import SshListener, SshConfig
-from ..config_defaults import (
+from ..service_config_defaults import (
     DEFAULT_MQTT_CONFIG,
     DEFAULT_SSH_CONFIG,
     merge_with_defaults,
 )
 from ...db.crud import config as config_crud
 from ...db.models import Room
+from ...db.models import Event
+
+logger = logging.getLogger(__name__)
 
 @dataclass
 class ServiceStatus:
@@ -32,17 +34,11 @@ class ServiceManager:
         self._mqtt: MqttWorker | None = None
         self._ssh: SshListener | None = None
 
-        self.event_queue: asyncio.Queue = asyncio.Queue(maxsize=5000)
-        self.ka_queue: asyncio.Queue = asyncio.Queue(maxsize=1000)
+        self.mqtt_queue: asyncio.Queue = asyncio.Queue(maxsize=5000)
+        self.ssh_queue: asyncio.Queue = asyncio.Queue(maxsize=5000)
+        self.ka_queue: asyncio.Queue = asyncio.Queue(maxsize=100)
 
         self.status = ServiceStatus(False, None, None, None)
-
-        # Pipeline (später kannst du hier dynamisch stages aus DB config bauen)
-        self.engine = WorkflowEngine(
-            stages=[
-                HttpGetStage(url_builder=self._url_builder),
-            ]
-        )
 
     def _load_config(self, key: str, default: dict) -> dict:
         db = self.ctx.SessionLocal()
@@ -62,11 +58,6 @@ class ServiceManager:
         return merge_with_defaults(parsed, default)
 
     def _url_builder(self, ctx: RuntimeContext, event: dict) -> str | None:
-        """
-        Hier: event auswerten + rooms aus SQLite laden + URL bauen.
-        Das ist nur ein Platzhalter.
-        """
-        # Beispiel: event enthält room_id
         room_id = event.get("room_id")
         if not room_id:
             return None
@@ -76,14 +67,15 @@ class ServiceManager:
             room = db.query(Room).filter(Room.id == room_id).first()
             if not room:
                 return None
-            return f"http://{room.ascom_rc_ip}/action?device_id={room.ascom_device_id}&room_id={room.id}"
+            return f"http://baseurl/?room_id={room.id}"
         finally:
             db.close()
 
     async def start(self):
         if self.status.running:
+            logger.warning("ServiceManager is already running")
             return
-
+        logger.info("Starting ServiceManager...")
         settings = self.ctx.settings
         mqtt_dict = self._load_config("mqtt", DEFAULT_MQTT_CONFIG)
         mqtt_dict["username"] = settings.mqtt_username
@@ -96,8 +88,8 @@ class ServiceManager:
         mqtt_cfg = MqttConfig(**mqtt_dict)
         ssh_cfg = SshConfig(**ssh_dict)
 
-        self._mqtt = MqttWorker(mqtt_cfg, self.event_queue, self.ka_queue)
-        self._ssh = SshListener(ssh_cfg, self.event_queue)
+        self._mqtt = MqttWorker(mqtt_cfg, self.mqtt_queue, self.ka_queue)
+        self._ssh = SshListener(ssh_cfg, self.ssh_queue)
 
         self.status.running = True
         self.status.started_at = time.time()
@@ -105,14 +97,15 @@ class ServiceManager:
 
         self._tasks = [
             asyncio.create_task(self._mqtt.run(), name="mqtt-subscribe"),
-            asyncio.create_task(self._mqtt.keepalive_publisher(), name="mqtt-keepalive-out"),
             asyncio.create_task(self._ssh.run(), name="ssh-listener"),
-            asyncio.create_task(self._event_loop(), name="event-loop"),
+            asyncio.create_task(self._mqtt_event_loop(), name="mqtt-event-loop"),
+            asyncio.create_task(self._ssh_event_loop(), name="ssh-event-loop"),
             asyncio.create_task(self._healthcheck_loop(), name="healthcheck-loop"),
         ]
 
     async def stop(self):
         if not self.status.running:
+            logger.warning("ServiceManager is not running")
             return
 
         self.status.running = False
@@ -129,15 +122,40 @@ class ServiceManager:
         self._tasks = []
         self._mqtt = None
         self._ssh = None
+        logger.info("ServiceManager stopped successfully")
 
-    async def _event_loop(self):
+    # Hier wird die Logik implementiert, wenn eine MQTT oder SSH Nachricht reinkommt.
+    async def _mqtt_event_loop(self):
         while self.status.running:
-            event = await self.event_queue.get()
+            event = await self.mqtt_queue.get()
             try:
-                await self.engine.handle_event(self.ctx, event)
+                logger.debug(f"Received event in MQTT Queue: {event}")
+                await self._handle_mqtt_event(self.ctx, event)
             except Exception as e:
                 self.status.last_error = str(e)
 
+    async def _ssh_event_loop(self):
+        while self.status.running:
+            event = await self.ssh_queue.get()
+            try:
+                logger.debug(f"Received event in SSH Queue: {event}")
+                await self._handle_ssh_event(self.ctx, event)
+            except Exception as e:
+                self.status.last_error = str(e)
+
+    async def _handle_mqtt_event(self, ctx: RuntimeContext, event: dict):
+        logger.debug(f"Handling MQTT event: {event}")
+        await self._mqtt.publish_resolve(qumea_activeAlertId=123, qumea_roomId="room-1")
+        logger.debug("Published resolve message to MQTT")
+        baseURL = ctx.http.base_url
+        logger.debug(f"Making HTTP GET request to {baseURL}/resolve")
+        await ctx.http.get(f"{baseURL}/resolve")
+
+
+    async def _handle_ssh_event(self, ctx: RuntimeContext, event: dict):
+        logger.debug(f"Handling SSH event: {event}")
+        await self._mqtt.publish_resolve(qumea_activeAlertId=123, qumea_roomId="room-1")
+        logger.debug("Published resolve message to MQTT")
     async def _healthcheck_loop(self):
         """
         - last_broker_keepalive wird über ka_queue aktualisiert

@@ -8,7 +8,7 @@ from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import RedirectResponse, FileResponse
 from contextlib import asynccontextmanager
-from .routers import public_routes, auth_routes, backup_routes, maintenance_routes, service_routes, config_routes
+from .routers import public_routes, auth_routes, backup_routes, maintenance_routes, service_routes, config_routes, room_routes
 from .logging_conf import setup_logging
 from .config import get_settings
 from .db.database import engine, Base, SessionLocal
@@ -18,7 +18,7 @@ from .ws import logs_socket
 from .services.runtime.context import RuntimeContext
 from .services.runtime.manager import ServiceManager
 from .services.http.client import create_http_client
-from .services.config_defaults import DEFAULT_HTTP_CONFIG, merge_with_defaults
+from .services.service_config_defaults import DEFAULT_HTTP_CONFIG, DEFAULT_SERVICE_CONFIG, merge_with_defaults
 
 # Logger anlegen für Applikation
 logger = logging.getLogger(__name__)
@@ -36,11 +36,16 @@ def create_app() -> FastAPI:
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
+        # Starte Logger
         logger.info("Startup: %s v%s", settings.app_name, __version__)
+
+        # Generiere ein geheimes JWT-Secret für die Laufzeit
         app.state.jwt_secret = secrets.token_urlsafe(64)
 
+        # Datenbank-Tabellen erstellen
         Base.metadata.create_all(bind=engine)
-
+        
+        # Lade HTTP-Konfiguration aus der Datenbank
         raw_http_cfg = None
         db = SessionLocal()
         try:
@@ -54,15 +59,41 @@ def create_app() -> FastAPI:
                 http_cfg = merge_with_defaults(json.loads(raw_http_cfg), DEFAULT_HTTP_CONFIG)
             except json.JSONDecodeError:
                 http_cfg = DEFAULT_HTTP_CONFIG.copy()
+        
+        # Lade Service-Konfiguration aus der Datenbank
+        raw_service_cfg = None
+        db = SessionLocal()
+        try:
+            raw_service_cfg = config_crud.get_value(db, "service")
+        finally:
+            db.close()
 
+        service_cfg = DEFAULT_SERVICE_CONFIG.copy()
+        if raw_service_cfg:
+            try:
+                service_cfg = merge_with_defaults(json.loads(raw_service_cfg), DEFAULT_SERVICE_CONFIG)
+            except json.JSONDecodeError:
+                service_cfg = DEFAULT_SERVICE_CONFIG.copy()
+
+        # Erstelle HTTP-Client mit der geladenen oder Standard-Konfiguration
         http = create_http_client(http_cfg)
+
+        # Runtime-Kontext und Service-Manager initialisieren
         ctx = RuntimeContext(SessionLocal=SessionLocal, http=http, settings=settings)
         app.state.service_manager = ServiceManager(ctx)
 
+        # Starte Service wenn enabled in der Konfiguration
+        if service_cfg.get("run_services_on_startup", False):
+            logger.info("Service-Manager wird beim Startup gestartet (run_services_on_startup=True)")
+            await app.state.service_manager.start()
+        else:
+            logger.info("Service-Manager wird nicht automatisch gestartet (run_services_on_startup=False)")
+        
+        
         try:
             yield
         finally:
-            logger.info("Shutdown: bye")
+            logger.info("Shutdown: Tool wird beendet")
 
             try:
                 await app.state.service_manager.stop()
@@ -86,7 +117,7 @@ def create_app() -> FastAPI:
         lifespan=lifespan,
     )
 
-    # --- STATIC FILES ---
+    # --- STATIC FILES für Web-UI ---
     BASE_DIR = Path(__file__).resolve().parent
     app.mount(
         "/static",
@@ -94,11 +125,12 @@ def create_app() -> FastAPI:
         name="static",
     )
 
+    # --- ROOT ENDPOINT --- Redirect zur Web-UI
     @app.get("/")
     async def root():
         return RedirectResponse("/static/")
     
-     # --- ROUTER ---
+    # --- ROUTERS --- Hier werden die verschiedenen API-Router eingebunden
     app.include_router(auth_routes.router)
     app.include_router(public_routes.router)
     app.include_router(logs_socket.router)
@@ -106,7 +138,9 @@ def create_app() -> FastAPI:
     app.include_router(maintenance_routes.router)
     app.include_router(config_routes.router)
     app.include_router(service_routes.router)
+    app.include_router(room_routes.router)
 
+    # Return der ganzen FastAPI-Applikation
     return app
 
 app = create_app()

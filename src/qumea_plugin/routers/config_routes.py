@@ -5,16 +5,17 @@ from sqlalchemy.orm import Session
 from ..deps import get_current_user
 from ..db.database import get_db
 from ..db.crud import config as config_crud
-from ..routers.api_models import MqttConfigDto, SshConfigDto, HttpClientConfigDto
-from ..services.config_defaults import (
+from ..routers.api_models import MqttConfigDto, ServiceConfigDto, SshConfigDto, HttpClientConfigDto
+from ..services.service_config_defaults import (
     DEFAULT_MQTT_CONFIG,
     DEFAULT_SSH_CONFIG,
     DEFAULT_HTTP_CONFIG,
+    DEFAULT_SERVICE_CONFIG,
     merge_with_defaults,
 )
 from ..services.http.client import create_http_client
 
-router = APIRouter(prefix="/config", tags=["Configuration"])
+router = APIRouter(prefix="/api/config", tags=["Configuration"])
 
 
 def _load_section(db: Session, key: str, default: dict) -> dict:
@@ -112,6 +113,22 @@ def update_http_config(
     cfg = _persist_section(db, "http", DEFAULT_HTTP_CONFIG, payload.model_dump())
     return cfg
 
+@router.get("/service")
+def get_service_config(
+    db: Session = Depends(get_db),
+    user=Depends(get_current_user),
+):
+    cfg = _load_section(db, "service", DEFAULT_SERVICE_CONFIG)
+    return cfg
+
+@router.put("/service")
+def update_service_config(
+    payload: ServiceConfigDto,
+    db: Session = Depends(get_db),
+    user=Depends(get_current_user),
+):
+    cfg = _persist_section(db, "service", DEFAULT_SERVICE_CONFIG, payload.model_dump())
+    return cfg
 
 @router.post("/reload")
 async def reload_services(
