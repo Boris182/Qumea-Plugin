@@ -13,7 +13,9 @@ DEFAULT_SSH_CONFIG = {
 }
 
 DEFAULT_HTTP_CONFIG = {
+    "timeout": 10.0,
     "http_base_url": "http://192.168.70.171:1880",
+    "verify_ssl": False,
 }
 
 DEFAULT_SERVICE_CONFIG = {

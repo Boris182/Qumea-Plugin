@@ -29,7 +29,9 @@ function save_settings() {
   };
 
   const http_settings = {
-    http_base_url: document.getElementById("http_base_url").value
+    timeout: parseFloat(document.getElementById("http_timeout").value),
+    http_base_url: document.getElementById("http_base_url").value,
+    verify_ssl: document.getElementById("http_verify_ssl").checked
   };
 
   const service_settings = {
@@ -95,6 +97,13 @@ function get_http_settings() {
     }).then(data => {
       console.log("HTTP Client Einstellungen:", data);
         document.getElementById("http_base_url").value = data.http_base_url || "";
+        document.getElementById("http_timeout").value = data.timeout || "";
+        const httpVerifySslCheckbox = document.getElementById("http_verify_ssl");
+        httpVerifySslCheckbox.checked = data.verify_ssl || false;
+        const label = httpVerifySslCheckbox.nextElementSibling;
+        if (label) {
+          label.textContent = httpVerifySslCheckbox.checked ? "Aktiviert" : "Deaktiviert";
+        }
     })
     .catch(err => console.error("Fehler:", err));
 };

@@ -8,7 +8,7 @@ from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import RedirectResponse, FileResponse
 from contextlib import asynccontextmanager
-from .routers import public_routes, auth_routes, backup_routes, maintenance_routes, service_routes, config_routes, room_routes
+from .routers import public_routes, auth_routes, backup_routes, maintenance_routes, service_routes, config_routes, room_routes, event_routes
 from .logging_conf import setup_logging
 from .config import get_settings
 from .db.database import engine, Base, SessionLocal
@@ -139,6 +139,7 @@ def create_app() -> FastAPI:
     app.include_router(config_routes.router)
     app.include_router(service_routes.router)
     app.include_router(room_routes.router)
+    app.include_router(event_routes.router)
 
     # Return der ganzen FastAPI-Applikation
     return app

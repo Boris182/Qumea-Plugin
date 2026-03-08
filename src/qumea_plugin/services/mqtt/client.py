@@ -20,6 +20,10 @@ class MqttConfig:
     @property
     def alert_topic(self) -> str:
         return f"qumea/tenant/{self.tenant_id}/public/v1/alert/+/type/+"
+    
+    @property
+    def confirm_topic(self) -> str:
+        return f"qumea/tenant/{self.tenant_id}/public/v1/alert/confirm/+"
 
     @property
     def keepalive_in_topic(self) -> str:
@@ -92,10 +96,12 @@ class MqttWorker:
         def on_connect(cl, userdata, flags, rc, properties=None):
             # rc == 0 => ok
             print("MQTT connected rc=", rc)
-            # Alert-Topic abonnieren, damit wir die Events empfangen können
+            # Alert-Topic
             cl.subscribe(self.cfg.alert_topic)
-            # Keepalive-Topic abonnieren, damit wir wissen, dass die Verbindung zum Broker noch steht (der Broker veröffentlicht dort regelmäßig Nachrichten)
+            # Keepalive-Topic
             cl.subscribe(self.cfg.keepalive_in_topic)
+            # Confirm-Topic
+            cl.subscribe(self.cfg.confirm_topic)
 
         def on_disconnect(cl, userdata, rc, properties=None):
             print("MQTT disconnected rc=", rc)
@@ -105,24 +111,38 @@ class MqttWorker:
             payload = msg.payload.decode(errors="replace")
             print(f"MQTT message topic={topic} payload={payload}")
 
-            # ins asyncio sicher reinreichen
             def handle():
+                data = None
+
                 # keepalive
                 if topic == self.cfg.keepalive_in_topic:
                     self.ka_queue.put_nowait(time.time())
                     return
 
-                try:
-                    data = json.loads(payload)
-                except json.JSONDecodeError:
-                    return
+                if "/alert/confirm" in topic:
+                    try:
+                        data = json.loads(payload)
+                        data["topic"] = "confirm"
+                    except json.JSONDecodeError:
+                        return
 
-                if self.cfg.events_to_handle:
-                    ev_type = data.get("alertType")
-                    if ev_type is None:
+                elif "/alert/" in topic:
+                    try:
+                        data = json.loads(payload)
+                        data["topic"] = "alert"
+                        print(f"Parsed MQTT alert event: {data}")
+                    except json.JSONDecodeError:
                         return
-                    if not self.cfg.events_to_handle.get(ev_type, False):
-                        return
+
+                    if self.cfg.events_to_handle:
+                        ev_type = data.get("alertType")
+                        if ev_type is None:
+                            return
+                        if not self.cfg.events_to_handle.get(ev_type, False):
+                            return
+
+                if data is None:
+                    return
 
                 self.mqtt_queue.put_nowait(data)
 

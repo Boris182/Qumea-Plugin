@@ -5,6 +5,7 @@ import time
 from dataclasses import dataclass
 from typing import Optional
 import logging
+from sqlalchemy.exc import IntegrityError
 
 from .context import RuntimeContext
 from ..mqtt.client import MqttWorker, MqttConfig
@@ -17,6 +18,7 @@ from ..service_config_defaults import (
 from ...db.crud import config as config_crud
 from ...db.models import Room
 from ...db.models import Event
+from ...db.models import EventStatus
 
 logger = logging.getLogger(__name__)
 
@@ -133,6 +135,7 @@ class ServiceManager:
                 await self._handle_mqtt_event(self.ctx, event)
             except Exception as e:
                 self.status.last_error = str(e)
+            print(f"Ater Handled: {event}")
 
     async def _ssh_event_loop(self):
         while self.status.running:
@@ -144,12 +147,76 @@ class ServiceManager:
                 self.status.last_error = str(e)
 
     async def _handle_mqtt_event(self, ctx: RuntimeContext, event: dict):
-        logger.debug(f"Handling MQTT event: {event}")
-        await self._mqtt.publish_resolve(qumea_activeAlertId=123, qumea_roomId="room-1")
-        logger.debug("Published resolve message to MQTT")
+        logger.debug("Handling MQTT event: %s", event)
+
+        db = ctx.SessionLocal()
         baseURL = ctx.http.base_url
-        logger.debug(f"Making HTTP GET request to {baseURL}/resolve")
-        await ctx.http.get(f"{baseURL}/resolve")
+        ascom_id = None
+
+        if event.get("topic") != "alert":
+            db.close()
+            return
+
+        try:
+            room = db.query(Room).filter(Room.room_name == event.get("roomName")).first()
+            if not room:
+                logger.warning("Room not found for event: %s", event.get("roomName"))
+                return
+
+            room.qumea_roomId = event.get("roomId")
+            active_alert_id = event.get("activeAlertId")
+
+            if not active_alert_id:
+                logger.warning("Missing activeAlertId in event: %s", event)
+                db.commit()
+                return
+
+            existing_open_event = (
+                db.query(Event)
+                .filter(
+                    Event.qumea_activeAlertId == active_alert_id,
+                    Event.status.notin_([
+                        EventStatus.DONE.value,
+                        EventStatus.FAILED.value,
+                        EventStatus.TIMEOUT.value,
+                    ]),
+                )
+                .first()
+            )
+
+            if existing_open_event is None:
+                new_event = Event(
+                    room_name=event.get("roomName"),
+                    status=EventStatus.NEW.value,
+                    qumea_alertType=event.get("alertType"),
+                    qumea_activeAlertId=active_alert_id,
+                    qumea_roomId=event.get("roomId"),
+                )
+                db.add(new_event)
+                logger.info("Created new event for activeAlertId=%s", active_alert_id)
+            else:
+                logger.info(
+                    "Open event already exists for activeAlertId=%s, skipping insert",
+                    active_alert_id,
+                )
+
+            db.commit()
+            ascom_id = room.ascom_device_id
+
+        except Exception:
+            db.rollback()
+            logger.exception("Error while handling MQTT event")
+            return
+
+        finally:
+            db.close()
+
+        if ascom_id:
+            try:
+                await ctx.http.get(f"{baseURL}/sendUCM?ascom_id={ascom_id}", timeout=5.0)
+            except Exception:
+                logger.exception("sendUCM request failed for ascom_id=%s", ascom_id)
+        
 
 
     async def _handle_ssh_event(self, ctx: RuntimeContext, event: dict):

@@ -78,6 +78,13 @@ class Room(Base):
         nullable=False,
     )
 
+    qumea_roomId: Mapped[str] = mapped_column(
+        String(100),
+        unique=True,
+        index=True,
+        nullable=True,
+    )
+
 
 class ServiceConfig(Base):
     __tablename__ = "service_config"

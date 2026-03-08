@@ -48,6 +48,7 @@ class HttpClientConfigDto(BaseModel):
 
     http_base_url: Optional[str] = None
     timeout: Optional[float] = None
+    verify_ssl: Optional[bool] = None
 
 class ServiceConfigDto(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -62,3 +63,10 @@ class RoomDto(BaseModel):
 class addRoomDto(BaseModel):
     room_name: str
     ascom_device_id: str
+
+class EventDto(BaseModel):
+    id: int
+    room_name: str
+    qumea_alertType: str
+    status: str
+    created_at: str

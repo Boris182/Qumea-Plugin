@@ -133,8 +133,38 @@ function getHealth(manual = false) {
     });
 }
 
+function get_active_events() {
+  authFetch("/api/event", {
+    method: "GET"
+  })
+    .then(res => res.json())
+    .then(events => {
+      const container = document.getElementById("events_table_body");
+      container.innerHTML = "";
+
+      events.forEach(event => {
+        const row = document.createElement("tr");
+        row.innerHTML = `
+          <td>${event.id}</td>
+          <td>${event.room_name}</td>
+          <td>${event.status}</td>
+          <td>${event.qumea_alertType}</td>
+          <td>${formatTime(event.created_at)}</td>
+          <td>
+            <button class="btn btn-sm btn-primary">Details</button>
+          </td>
+        `;
+        container.appendChild(row);
+      });
+    })
+    .catch(err => {
+      console.error("[Fehler beim Laden der aktiven Events]", err);
+    });
+}
+
 // Initial load
 getHealth();
 
 // Auto refresh (z.B. alle 5 Sekunden)
 setInterval(getHealth, 5000);
+get_active_events();
