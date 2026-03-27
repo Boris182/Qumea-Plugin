@@ -1,5 +1,6 @@
 from fastapi import APIRouter, HTTPException, Depends, Request
 from fastapi.responses import JSONResponse
+from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 from ..config import get_settings
 from ..deps import get_current_user
@@ -23,34 +24,61 @@ def register(user: UserRegister, db: Session = Depends(get_db)):
     """
     if db.query(User).first():
         raise HTTPException(status_code=403, detail="Login existiert bereits")
-    db_user = User(user_name=user.user_name, hashed_password=crypt_password(user.password))
+    db_user = User(username=user.username, hashed_password=crypt_password(user.password))
     db.add(db_user)
     db.commit()
     db.refresh(db_user)
     return JSONResponse(status_code=201, content={"message": "Registrierung erfolgreich"})
 
+"""
+
 @router.post("/login")
 def login(user: UserLogin, request: Request, db: Session = Depends(get_db)):
 
-    db_user = db.query(User).filter(User.user_name == user.user_name).first()
+    db_user = db.query(User).filter(User.username == user.username).first()
 
     if not db_user or not verify_password(user.password, db_user.hashed_password):
         raise HTTPException(status_code=401, detail="Ungültige Anmeldedaten")
 
     token = create_access_token(
-        subject=db_user.user_name,
+        subject=db_user.username,
         secret=request.app.state.jwt_secret,
         algorithm=settings.jwt_alg,
         expires_minutes=settings.jwt_expire_min,
     )
     logger.info("User hat sich eingeloggt")
     return {"access_token": token, "token_type": "bearer"}
+"""
+
+@router.post("/login")
+def login(
+    request: Request,
+    form_data: OAuth2PasswordRequestForm = Depends(),
+    db: Session = Depends(get_db)
+):
+    db_user = db.query(User).filter(User.username == form_data.username).first()
+
+    if not db_user or not verify_password(form_data.password, db_user.hashed_password):
+        raise HTTPException(
+            status_code=401,
+            detail="Ungültige Anmeldedaten",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    token = create_access_token(
+        subject=db_user.username,
+        secret=request.app.state.jwt_secret,
+        algorithm=settings.jwt_alg,
+        expires_minutes=settings.jwt_expire_min,
+    )
+
+    return {"access_token": token, "token_type": "bearer"}
 
 @router.get("/auth/check", description="Prüft, ob der aktuelle Token gültig ist.")
 def auth_check(user=Depends(get_current_user)):
     return {
         "status": "ok", 
-        "user": user['user_name']
+        "user": user['username']
     }
 
 @router.get("/registerCheck", description="Check if a User exist")

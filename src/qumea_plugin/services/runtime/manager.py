@@ -153,69 +153,99 @@ class ServiceManager:
         baseURL = ctx.http.base_url
         ascom_id = None
 
-        if event.get("topic") != "alert":
-            db.close()
-            return
-
-        try:
-            room = db.query(Room).filter(Room.room_name == event.get("roomName")).first()
-            if not room:
-                logger.warning("Room not found for event: %s", event.get("roomName"))
-                return
-
-            room.qumea_roomId = event.get("roomId")
-            active_alert_id = event.get("activeAlertId")
-
-            if not active_alert_id:
-                logger.warning("Missing activeAlertId in event: %s", event)
-                db.commit()
-                return
-
-            existing_open_event = (
-                db.query(Event)
-                .filter(
-                    Event.qumea_activeAlertId == active_alert_id,
-                    Event.status.notin_([
-                        EventStatus.DONE.value,
-                        EventStatus.FAILED.value,
-                        EventStatus.TIMEOUT.value,
-                    ]),
-                )
-                .first()
-            )
-
-            if existing_open_event is None:
-                new_event = Event(
-                    room_name=event.get("roomName"),
-                    status=EventStatus.NEW.value,
-                    qumea_alertType=event.get("alertType"),
-                    qumea_activeAlertId=active_alert_id,
-                    qumea_roomId=event.get("roomId"),
-                )
-                db.add(new_event)
-                logger.info("Created new event for activeAlertId=%s", active_alert_id)
-            else:
-                logger.info(
-                    "Open event already exists for activeAlertId=%s, skipping insert",
-                    active_alert_id,
-                )
-
-            db.commit()
-            ascom_id = room.ascom_device_id
-
-        except Exception:
-            db.rollback()
-            logger.exception("Error while handling MQTT event")
-            return
-
-        finally:
-            db.close()
-
-        if ascom_id:
+        if event.get("msg_type") == "alert":
             try:
-                await ctx.http.get(f"{baseURL}/sendUCM?ascom_id={ascom_id}", timeout=5.0)
+                room = db.query(Room).filter(Room.room_name == event.get("roomName")).first()
+                if not room:
+                    logger.warning("Room not found for event: %s", event.get("roomName"))
+                    return
+                
+                logger.debug("Found room in DB: %s with ASCOM ID: %s", room.room_name, room.ascom_device_id)
+
+                room.qumea_roomId = event.get("roomId")
+                active_alert_id = event.get("activeAlertId")
+
+                if not active_alert_id:
+                    logger.warning("Missing activeAlertId in event: %s", event)
+                    db.commit()
+                    return
+
+                existing_open_event = (
+                    db.query(Event)
+                    .filter(
+                        Event.qumea_activeAlertId == active_alert_id,
+                        Event.status.notin_([
+                            EventStatus.DONE.value,
+                            EventStatus.FAILED.value,
+                            EventStatus.TIMEOUT.value,
+                        ]),
+                    )
+                    .first()
+                )
+
+                logger.debug("Existing open event for activeAlertId %s: %s", active_alert_id, existing_open_event)
+
+                if existing_open_event is None:
+                    new_event = Event(
+                        room_name=event.get("roomName"),
+                        status=EventStatus.NEW.value,
+                        qumea_alertType=event.get("alertType"),
+                        qumea_activeAlertId=active_alert_id,
+                        qumea_roomId=event.get("roomId"),
+                    )
+                    db.add(new_event)
+                    logger.info("Created new event for activeAlertId=%s", active_alert_id)
+                else:
+                    existing_open_event.touch()
+                    logger.info("Open event already exists for activeAlertId=%s, skipping insert", active_alert_id)
+
+                db.commit()
+
+                try:
+                    ascom_id = (
+                        db.query(Room.ascom_device_id)
+                        .filter(Room.room_name == event.get("roomName"))
+                        .scalar()
+                    )
+                except Exception:
+                    logger.exception("Error while querying ASCOM device ID for room: %s", event.get("roomName"))
+                    ascom_id = None
+
+                if ascom_id is None:
+                    logger.warning("ASCOM device ID not found for room: %s", event.get("roomName"))
+                    return
+
             except Exception:
-                logger.exception("sendUCM request failed for ascom_id=%s", ascom_id)
+                db.rollback()
+                logger.exception("Error while handling MQTT event")
+                return
+
+            finally:
+                db.close()
+
+            if ascom_id:
+                try:
+                    success = await ctx.http.get(f"{baseURL}/sendUCM?ascom_id={ascom_id}", timeout=5.0)
+                    db = ctx.SessionLocal()
+                    try:
+                        event = db.query(Event).filter(Event.qumea_activeAlertId == active_alert_id).first()
+                    except Exception:
+                        logger.exception("Error while querying event for activeAlertId=%s", active_alert_id)
+                        event = None
+                    if not success:
+                        logger.error("sendUCM request failed for ascom_id=%s", ascom_id)
+                        if event:
+                            event.status = EventStatus.FAILED.value
+                            db.commit()
+                    else:
+                        logger.info("sendUCM request succeeded for ascom_id=%s", ascom_id)
+                        if event:
+                            event.status = EventStatus.WAITING.value
+                            db.commit()
+                except Exception:
+                    logger.exception("Error while updating event status for activeAlertId=%s", active_alert_id)
+                finally:
+                    db.close()
         
 
 
@@ -223,6 +253,7 @@ class ServiceManager:
         logger.debug(f"Handling SSH event: {event}")
         await self._mqtt.publish_resolve(qumea_activeAlertId=123, qumea_roomId="room-1")
         logger.debug("Published resolve message to MQTT")
+
     async def _healthcheck_loop(self):
         """
         - last_broker_keepalive wird über ka_queue aktualisiert

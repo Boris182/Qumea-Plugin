@@ -18,20 +18,24 @@ class MqttConfig:
     events_to_handle: dict | None
 
     @property
-    def alert_topic(self) -> str:
+    def alert_in_topic(self) -> str:
         return f"qumea/tenant/{self.tenant_id}/public/v1/alert/+/type/+"
     
     @property
-    def confirm_topic(self) -> str:
+    def confirm_in_topic(self) -> str:
         return f"qumea/tenant/{self.tenant_id}/public/v1/alert/confirm/+"
+    
+    @property
+    def resolve_in_topic(self) -> str:
+        return f"qumea/tenant/{self.tenant_id}/public/v1/alert/+/resolved"
 
     @property
     def keepalive_in_topic(self) -> str:
-        return f"qumea/tenant/{self.tenant_id}/public/v1/keepalive/in"
+        return f"qumea/tenant/{self.tenant_id}/public/v1/alive"
 
     @property
     def keepalive_out_topic(self) -> str:
-        return f"qumea/tenant/{self.tenant_id}/public/v1/keepalive/out"
+        return f"qumea/tenant/{self.tenant_id}/public/v1/integration/{self.integrationId}/alive"
 
 
 class MqttWorker:
@@ -65,7 +69,7 @@ class MqttWorker:
                     "issues": issues if issueActive else [],
                 }
             )
-            topic = f"qumea/tenant/{self.cfg.tenant_id}/public/v1/integration/{self.cfg.integrationId}/alive"
+            topic = self.cfg.keepalive_out_topic
             self._client.publish(topic, payload=payload)
 
     # Sende Quittierung auf Event Topic
@@ -77,14 +81,14 @@ class MqttWorker:
                     "activeAlertId": qumea_activeAlertId,
                     "tenant": self.cfg.tenant_id,
                     "resolveAllAlertsInRoom": True,
-                    "resolverName": "axelion",
+                    "resolverName": self.cfg.integrationId,
                 }
             )
             topic = f"qumea/tenant/{self.cfg.tenant_id}/public/v1/alert/{qumea_activeAlertId}/resolve"
             self._client.publish(topic, payload=payload)
 
     async def run(self):
-        # asyncio-loop merken, damit wir aus dem MQTT-Thread sicher reinposten können
+
         self._loop = asyncio.get_running_loop()
 
         client = paho.Client(client_id=self.cfg.client_id, protocol=paho.MQTTv311)
@@ -97,11 +101,13 @@ class MqttWorker:
             # rc == 0 => ok
             print("MQTT connected rc=", rc)
             # Alert-Topic
-            cl.subscribe(self.cfg.alert_topic)
+            cl.subscribe(self.cfg.alert_in_topic)
             # Keepalive-Topic
             cl.subscribe(self.cfg.keepalive_in_topic)
             # Confirm-Topic
-            cl.subscribe(self.cfg.confirm_topic)
+            cl.subscribe(self.cfg.confirm_in_topic)
+            # Resolve-Topic
+            cl.subscribe(self.cfg.resolve_in_topic)
 
         def on_disconnect(cl, userdata, rc, properties=None):
             print("MQTT disconnected rc=", rc)
@@ -112,40 +118,40 @@ class MqttWorker:
             print(f"MQTT message topic={topic} payload={payload}")
 
             def handle():
-                data = None
-
-                # keepalive
                 if topic == self.cfg.keepalive_in_topic:
                     self.ka_queue.put_nowait(time.time())
                     return
 
                 if "/alert/confirm" in topic:
-                    try:
-                        data = json.loads(payload)
-                        data["topic"] = "confirm"
-                    except json.JSONDecodeError:
-                        return
-
+                    msg_type = "confirm"
+                elif topic.endswith("/resolved"):
+                    msg_type = "resolved"
                 elif "/alert/" in topic:
-                    try:
-                        data = json.loads(payload)
-                        data["topic"] = "alert"
-                        print(f"Parsed MQTT alert event: {data}")
-                    except json.JSONDecodeError:
-                        return
-
-                    if self.cfg.events_to_handle:
-                        ev_type = data.get("alertType")
-                        if ev_type is None:
-                            return
-                        if not self.cfg.events_to_handle.get(ev_type, False):
-                            return
-
-                if data is None:
+                    msg_type = "alert"
+                else:
                     return
+
+                try:
+                    data = json.loads(payload)
+                    if not isinstance(data, dict):
+                        return
+                except json.JSONDecodeError:
+                    return
+
+                data["msg_type"] = msg_type
+
+                if msg_type == "alert":
+                    print(f"Parsed MQTT alert event: {data}")
+
+                    events_filter = self.cfg.events_to_handle
+                    if events_filter:
+                        ev_type = data.get("alertType")
+                        if ev_type is None or not events_filter.get(ev_type, False):
+                            return
 
                 self.mqtt_queue.put_nowait(data)
 
+            # MQTT Callback läuft in eigenem Thread, daher call_soon_threadsafe um in den asyncio Loop zu wechseln
             self._loop.call_soon_threadsafe(handle)
 
         client.on_connect = on_connect
@@ -158,5 +164,5 @@ class MqttWorker:
         # startet Netzwerkloop in eigenem Thread
         client.loop_start()
 
-        # asyncio-task bleibt “am Leben” bis stop
+        # Läuft bis stop
         await self._stop.wait()

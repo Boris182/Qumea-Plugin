@@ -5,14 +5,18 @@ document.addEventListener('DOMContentLoaded', () => {
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
 
-    const user_name = document.getElementById('user_name').value.trim();
+    const username = document.getElementById('user_name').value.trim();
     const password = document.getElementById('password').value;
 
     try {
+      const body = new URLSearchParams();
+      body.append('username', username);
+      body.append('password', password);
+
       const res = await fetch('/login', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ user_name, password })
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: body.toString()
       });
 
       if (!res.ok) {
@@ -23,8 +27,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
       const data = await res.json();
       localStorage.setItem('auth_token', data.access_token);
-      localStorage.setItem('user_name', data.user_name);
-      localStorage.setItem('role', data.role);
+      localStorage.setItem('username', username);
 
       window.location.href = '/static/index.html';
 

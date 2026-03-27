@@ -19,9 +19,10 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["Backups"], prefix="/api/backups")
 
-MAGIC = b"SL3BKUP"     # Magic-Header zur Erkennung
-VERSION = b"\x01"       # Formatversion
-ASSOCIATED_DATA = b"sqlite-backup"  # AAD für GCM
+#### Verschlüsselungs-Helper ###
+MAGIC = b"SL3BKUP"     
+VERSION = b"\x01"       
+ASSOCIATED_DATA = b"sqlite-backup"  
 
 def _derive_key(password: str, salt: bytes) -> bytes:
     kdf = Scrypt(salt=salt, length=32, n=2**14, r=8, p=1)
@@ -31,7 +32,7 @@ def encrypt_bytes(plaintext: bytes, password: str) -> bytes:
     salt = os.urandom(16)
     key = _derive_key(password, salt)
     aes = AESGCM(key)
-    nonce = os.urandom(12)  # 96-bit Nonce für GCM
+    nonce = os.urandom(12) 
     ciphertext = aes.encrypt(nonce, plaintext, ASSOCIATED_DATA)
     return MAGIC + VERSION + salt + nonce + ciphertext
 
@@ -49,7 +50,7 @@ def decrypt_bytes(payload: bytes, password: str) -> bytes:
     aes = AESGCM(key)
     return aes.decrypt(nonce, ciphertext, ASSOCIATED_DATA)
 
-###### Helper Funktionen ######
+### Helper Funktion für Größe des Backups ###
 def format_size(bytes_size: int) -> str:
     for unit in ['B', 'KB', 'MB', 'GB']:
         if bytes_size < 1024:
@@ -66,7 +67,7 @@ def db_backup(user=Depends(get_current_user)):
         logger.info(f"SQLite DB nicht gefunden")
         raise HTTPException(status_code=500, detail="app.db nicht gefunden")
 
-    backup_path = Path("backups")
+    backup_path = Path("backup")
     backup_path.mkdir(parents=True, exist_ok=True)
 
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -81,13 +82,13 @@ def db_backup(user=Depends(get_current_user)):
         return {"status": "success", "backup_file": str(backup_file), "timestamp": timestamp}
     except Exception as e:
         logger.error(f"Fehler beim Backup: {e}")
-        raise HTTPException(status_code=500, detail="Fehler beim Erstellen des Backups")
+        raise HTTPException(status_code=500, detail="Fehler beim Erstellen des Backup")
     
-### Get the DB State ###
+### Zeige Backup Status###
 @router.get("/db/status", description="Check the status of the SQLite database.")
 def db_status(user=Depends(get_current_user)):
     db_file = Path("./database/app.db")
-    backup_dir = Path("./backups")
+    backup_dir = Path("./backup")
     backup_files = list(backup_dir.glob("app_backup_*.db"))
 
     if not db_file.exists():
@@ -115,6 +116,7 @@ def db_status(user=Depends(get_current_user)):
         logger.error(f"Fehler beim Zugriff auf die Datenbank: {e}")
         raise HTTPException(status_code=500, detail="Datenbank ist nicht erreichbar")
 
+### Download verschlüsseltes Backup ###
 @router.post("/db/backup", description="Erstellt ein verschlüsseltes Backup der SQLite-Datenbank und liefert die .db.enc-Datei.")
 def db_backup(req: BackupRequest = Body(...), user=Depends(get_current_user)):
     db_file = Path("./database/app.db")
@@ -122,7 +124,7 @@ def db_backup(req: BackupRequest = Body(...), user=Depends(get_current_user)):
         logger.info("SQLite DB nicht gefunden")
         raise HTTPException(status_code=500, detail="app.db nicht gefunden")
 
-    backup_path = Path("backups")
+    backup_path = Path("backup")
     backup_path.mkdir(parents=True, exist_ok=True)
 
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -162,8 +164,9 @@ def db_backup(req: BackupRequest = Body(...), user=Depends(get_current_user)):
         # Aufräumen
         try: tmp_plain.unlink(missing_ok=True)
         except Exception: pass
-        raise HTTPException(status_code=500, detail="Fehler beim Erstellen des Backups")
-    
+        raise HTTPException(status_code=500, detail="Fehler beim Erstellen des Backup")
+
+### Restore Backup ###
 @router.post("/db/restore", description="Stellt die SQLite-Datenbank aus einem (ggf. verschlüsselten) Backup wieder her.")
 async def restore_backup(
     file: UploadFile = File(...),
@@ -175,7 +178,7 @@ async def restore_backup(
         logger.info("SQLite DB nicht gefunden")
         raise HTTPException(status_code=500, detail="app.db nicht gefunden")
 
-    backup_path = Path("backups")
+    backup_path = Path("backup")
     backup_path.mkdir(parents=True, exist_ok=True)
 
     try:
@@ -185,7 +188,7 @@ async def restore_backup(
         # 2) ggf. entschlüsseln
         if content.startswith(b"SL3BKUP\x01"):
             if not password:
-                raise HTTPException(status_code=400, detail="Passwort wird für verschlüsselte Backups benötigt")
+                raise HTTPException(status_code=400, detail="Passwort wird für verschlüsselte Backup benötigt")
             try:
                 content = decrypt_bytes(content, password)
             except Exception:
@@ -229,4 +232,4 @@ async def restore_backup(
         raise
     except Exception as e:
         logger.error(f"Fehler beim Wiederherstellen: {e}")
-        raise HTTPException(status_code=500, detail="Fehler beim Wiederherstellen des Backups")
+        raise HTTPException(status_code=500, detail="Fehler beim Wiederherstellen des Backup")
