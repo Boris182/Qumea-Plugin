@@ -50,6 +50,7 @@ coverage.xml
 .hypothesis/
 .pytest_cache/
 cover/
+.vscode
 
 # Translations
 *.mo
@@ -193,8 +194,9 @@ cython_debug/
 .cursorignore
 .cursorindexingignore
 
-# Backups und Logs
+# Backups, Logs und Scripts
 *.db
 *.enc
 *.tar
 /logs/*
+/scripts/*
