@@ -29,10 +29,6 @@ class MqttConfig:
     @property
     def confirm_in_topic(self) -> str:
         return f"qumea/tenant/{self.tenant_id}/public/v1/alert/confirm/+"
-    
-    @property
-    def resolve_in_topic(self) -> str:
-        return f"qumea/tenant/{self.tenant_id}/public/v1/room/+/alert/+/resolved"
 
     @property
     def keepalive_in_topic(self) -> str:
@@ -94,6 +90,7 @@ class MqttWorker:
             self._client.publish(topic, payload=payload)
 
     async def run(self):
+        # asyncio-loop merken, damit wir aus dem MQTT-Thread sicher reinposten können
         self._loop = asyncio.get_running_loop()
 
         client = paho.Client(
@@ -107,25 +104,15 @@ class MqttWorker:
         if self.cfg.username:
             client.username_pw_set(self.cfg.username, self.cfg.password)
 
-        client.tls_set(cert_reqs=ssl.CERT_REQUIRED)
-        client.tls_insecure_set(False)
-
-        client.enable_logger(logger)
-
-        def on_connect(cl, userdata, flags, reason_code, properties):
-            logger.info(
-                "MQTT connected: reason_code=%s flags=%s properties=%s",
-                reason_code, flags, properties
-            )
-
-            for topic in [
-                self.cfg.alert_in_topic,
-                self.cfg.keepalive_in_topic,
-                self.cfg.confirm_in_topic,
-                self.cfg.resolve_in_topic,
-            ]:
-                res, mid = cl.subscribe(topic, qos=0)
-                logger.info("Subscribe sent: topic=%s result=%s mid=%s", topic, res, mid)
+        def on_connect(cl, userdata, flags, rc, properties=None):
+            # rc == 0 => ok
+            print("MQTT connected rc=", rc)
+            # Alert-Topic
+            cl.subscribe(self.cfg.alert_topic)
+            # Keepalive-Topic
+            cl.subscribe(self.cfg.keepalive_in_topic)
+            # Confirm-Topic
+            cl.subscribe(self.cfg.confirm_topic)
 
         def on_disconnect(cl, userdata, disconnect_flags, reason_code, properties):
             logger.error(
@@ -162,21 +149,15 @@ class MqttWorker:
                     data = json.loads(payload)
                     if not isinstance(data, dict):
                         return
-                except json.JSONDecodeError:
-                    logger.warning("Invalid JSON payload on topic=%s", topic)
-                    return
 
-                data["msg_type"] = msg_type
-
-                if msg_type == "alert":
-                    events_filter = self.cfg.events_to_handle
-                    if events_filter:
+                    if self.cfg.events_to_handle:
                         ev_type = data.get("alertType")
                         if ev_type is None or not events_filter.get(ev_type, False):
                             return
 
                 self.mqtt_queue.put_nowait(data)
 
+            # MQTT Callback läuft in eigenem Thread, daher call_soon_threadsafe um in den asyncio Loop zu wechseln
             self._loop.call_soon_threadsafe(handle)
 
         def on_log(cl, userdata, level, buf):
@@ -208,4 +189,6 @@ class MqttWorker:
         )
 
         client.loop_start()
+
+        # asyncio-task bleibt “am Leben” bis stop
         await self._stop.wait()

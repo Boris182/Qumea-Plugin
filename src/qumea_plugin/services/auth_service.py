@@ -27,7 +27,7 @@ def get_user_from_token(
     except JWTError:
         raise credentials_exception
 
-    user = db.query(User).filter(User.username == username).first()
+    user = db.query(User).filter(User.user_name == user_name).first()
     if not user:
         raise credentials_exception
 

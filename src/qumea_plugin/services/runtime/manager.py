@@ -326,35 +326,8 @@ class ServiceManager:
         
 
         logger.debug(f"Handling SSH event: {event}")
-
-        handlers = {
-            "Call": handle_call,
-            "CallCancel": handle_call_cancel,
-            "NursePresent": handle_nurse_present,
-            "NursePresentCancel": handle_nurse_present_cancel,
-        }
-
-        call_handlers = {
-            "Fall": handle_fall,
-            "Bed": handle_bed,
-            "NoReturn": handle_no_return
-        }
-
-        call_cancel_handlers = {
-            "Fall": handle_fall_cancel,
-            "Bed": handle_bed_cancel,
-            "NoReturn": handle_no_return_cancel     
-        }
-
-        event_type = event.get("type")
-        handler = handlers.get(event_type)
-
-        if handler:
-            handler(event)
-        else:
-            logger.warning(f"Unknown event type: {event_type}")
-
-
+        await self._mqtt.publish_resolve(qumea_activeAlertId=123, qumea_roomId="room-1")
+        logger.debug("Published resolve message to MQTT")
     async def _healthcheck_loop(self):
         """
         - last_broker_keepalive wird über ka_queue aktualisiert
