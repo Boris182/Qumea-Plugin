@@ -2,9 +2,14 @@ import asyncio
 import json
 import time
 from dataclasses import dataclass
-
+import logging
 import paho.mqtt.client as paho
+from paho.mqtt.enums import CallbackAPIVersion
+from paho.mqtt.properties import Properties
+from paho.mqtt.packettypes import PacketTypes
+import ssl
 
+logger = logging.getLogger(__name__)
 
 @dataclass
 class MqttConfig:
@@ -18,20 +23,24 @@ class MqttConfig:
     events_to_handle: dict | None
 
     @property
-    def alert_topic(self) -> str:
+    def alert_in_topic(self) -> str:
         return f"qumea/tenant/{self.tenant_id}/public/v1/alert/+/type/+"
     
     @property
-    def confirm_topic(self) -> str:
+    def confirm_in_topic(self) -> str:
         return f"qumea/tenant/{self.tenant_id}/public/v1/alert/confirm/+"
+    
+    @property
+    def resolve_in_topic(self) -> str:
+        return f"qumea/tenant/{self.tenant_id}/public/v1/room/+/alert/+/resolved"
 
     @property
     def keepalive_in_topic(self) -> str:
-        return f"qumea/tenant/{self.tenant_id}/public/v1/keepalive/in"
+        return f"qumea/tenant/{self.tenant_id}/public/v1/alive"
 
     @property
     def keepalive_out_topic(self) -> str:
-        return f"qumea/tenant/{self.tenant_id}/public/v1/keepalive/out"
+        return f"qumea/tenant/{self.tenant_id}/public/v1/integration/{self.integrationId}/alive"
 
 
 class MqttWorker:
@@ -65,11 +74,12 @@ class MqttWorker:
                     "issues": issues if issueActive else [],
                 }
             )
-            topic = f"qumea/tenant/{self.cfg.tenant_id}/public/v1/integration/{self.cfg.integrationId}/alive"
+            topic = self.cfg.keepalive_out_topic
             self._client.publish(topic, payload=payload)
 
     # Sende Quittierung auf Event Topic
     async def publish_resolve(self, qumea_activeAlertId: int, qumea_roomId: str):
+        logger.debug(f"Notifying Qumea of resolved alertId={qumea_activeAlertId} roomId={qumea_roomId}")
         if self._client is not None:
             payload = json.dumps(
                 {
@@ -77,86 +87,125 @@ class MqttWorker:
                     "activeAlertId": qumea_activeAlertId,
                     "tenant": self.cfg.tenant_id,
                     "resolveAllAlertsInRoom": True,
-                    "resolverName": "axelion",
+                    "resolverName": self.cfg.integrationId,
                 }
             )
             topic = f"qumea/tenant/{self.cfg.tenant_id}/public/v1/alert/{qumea_activeAlertId}/resolve"
             self._client.publish(topic, payload=payload)
 
     async def run(self):
-        # asyncio-loop merken, damit wir aus dem MQTT-Thread sicher reinposten können
         self._loop = asyncio.get_running_loop()
 
-        client = paho.Client(client_id=self.cfg.client_id, protocol=paho.MQTTv311)
+        client = paho.Client(
+            callback_api_version=CallbackAPIVersion.VERSION2,
+            client_id=self.cfg.client_id,
+            protocol=paho.MQTTv5,
+            transport="tcp",
+        )
         self._client = client
 
-        if self.cfg.username is not None:
+        if self.cfg.username:
             client.username_pw_set(self.cfg.username, self.cfg.password)
 
-        def on_connect(cl, userdata, flags, rc, properties=None):
-            # rc == 0 => ok
-            print("MQTT connected rc=", rc)
-            # Alert-Topic
-            cl.subscribe(self.cfg.alert_topic)
-            # Keepalive-Topic
-            cl.subscribe(self.cfg.keepalive_in_topic)
-            # Confirm-Topic
-            cl.subscribe(self.cfg.confirm_topic)
+        client.tls_set(cert_reqs=ssl.CERT_REQUIRED)
+        client.tls_insecure_set(False)
 
-        def on_disconnect(cl, userdata, rc, properties=None):
-            print("MQTT disconnected rc=", rc)
+        client.enable_logger(logger)
+
+        def on_connect(cl, userdata, flags, reason_code, properties):
+            logger.info(
+                "MQTT connected: reason_code=%s flags=%s properties=%s",
+                reason_code, flags, properties
+            )
+
+            for topic in [
+                self.cfg.alert_in_topic,
+                self.cfg.keepalive_in_topic,
+                self.cfg.confirm_in_topic,
+                self.cfg.resolve_in_topic,
+            ]:
+                res, mid = cl.subscribe(topic, qos=0)
+                logger.info("Subscribe sent: topic=%s result=%s mid=%s", topic, res, mid)
+
+        def on_disconnect(cl, userdata, disconnect_flags, reason_code, properties):
+            logger.error(
+                "MQTT disconnected: reason_code=%s disconnect_flags=%s properties=%s",
+                reason_code, disconnect_flags, properties
+            )
+
+        def on_subscribe(cl, userdata, mid, reason_code_list, properties):
+            logger.info(
+                "SUBACK: mid=%s reason_codes=%s properties=%s",
+                mid, reason_code_list, properties
+            )
 
         def on_message(cl, userdata, msg):
             topic = msg.topic
             payload = msg.payload.decode(errors="replace")
-            print(f"MQTT message topic={topic} payload={payload}")
+            logger.debug("MQTT message topic=%s payload=%s", topic, payload)
 
             def handle():
-                data = None
-
-                # keepalive
                 if topic == self.cfg.keepalive_in_topic:
                     self.ka_queue.put_nowait(time.time())
                     return
 
                 if "/alert/confirm" in topic:
-                    try:
-                        data = json.loads(payload)
-                        data["topic"] = "confirm"
-                    except json.JSONDecodeError:
-                        return
-
+                    msg_type = "confirm"
+                elif topic.endswith("/resolved"):
+                    msg_type = "resolved"
                 elif "/alert/" in topic:
-                    try:
-                        data = json.loads(payload)
-                        data["topic"] = "alert"
-                        print(f"Parsed MQTT alert event: {data}")
-                    except json.JSONDecodeError:
-                        return
-
-                    if self.cfg.events_to_handle:
-                        ev_type = data.get("alertType")
-                        if ev_type is None:
-                            return
-                        if not self.cfg.events_to_handle.get(ev_type, False):
-                            return
-
-                if data is None:
+                    msg_type = "alert"
+                else:
                     return
+
+                try:
+                    data = json.loads(payload)
+                    if not isinstance(data, dict):
+                        return
+                except json.JSONDecodeError:
+                    logger.warning("Invalid JSON payload on topic=%s", topic)
+                    return
+
+                data["msg_type"] = msg_type
+
+                if msg_type == "alert":
+                    events_filter = self.cfg.events_to_handle
+                    if events_filter:
+                        ev_type = data.get("alertType")
+                        if ev_type is None or not events_filter.get(ev_type, False):
+                            return
 
                 self.mqtt_queue.put_nowait(data)
 
             self._loop.call_soon_threadsafe(handle)
 
+        def on_log(cl, userdata, level, buf):
+            logger.debug("PAHO LOG level=%s: %s", level, buf)
+
         client.on_connect = on_connect
         client.on_disconnect = on_disconnect
+        client.on_subscribe = on_subscribe
         client.on_message = on_message
+        client.on_log = on_log
 
-        print(f"Connecting MQTT {self.cfg.host}:{self.cfg.port} id={self.cfg.client_id} user={self.cfg.username}")
-        client.connect(self.cfg.host, self.cfg.port, keepalive=30)
+        # MQTT v5: leer wie in Node-RED "Session-Zeitablauf" leer
+        connect_props = Properties(PacketTypes.CONNECT)
+        # Nicht setzen = Broker-Default / keine explizite Session Expiry
 
-        # startet Netzwerkloop in eigenem Thread
+        logger.info(
+            "Connecting MQTT v5 to host=%s port=%s client_id=%s",
+            self.cfg.host,
+            self.cfg.port,
+            self.cfg.client_id,
+        )
+
+        client.connect(
+            host=self.cfg.host,          # nur mqtt.qumea.cloud
+            port=self.cfg.port,          # 8883
+            keepalive=60,                # wie Node-RED
+            clean_start=True,            # "Bereinigter Start"
+            properties=connect_props,
+        )
+
         client.loop_start()
-
-        # asyncio-task bleibt “am Leben” bis stop
         await self._stop.wait()

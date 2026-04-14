@@ -6,7 +6,7 @@ from sqlalchemy import and_
 from ..models import Event, EventStatus
 
 def list_events(db: Session) -> list[Event]:
-    return db.query(Event).all()
+    return db.query(Event).filter(Event.status != EventStatus.DONE).all()
 
 
 def get_event(db: Session, event_id: int) -> Event | None:
@@ -18,5 +18,10 @@ def delete_event(db: Session, id: int) -> bool:
     if not event:
         return False
     db.delete(event)
+    db.commit()
+    return True
+
+def clear_events(db: Session) -> bool:
+    db.query(Event).filter(Event.status != EventStatus.DONE).update({Event.status: EventStatus.DONE}, synchronize_session=False)
     db.commit()
     return True

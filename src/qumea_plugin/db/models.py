@@ -11,12 +11,12 @@ from .database import Base
 # -------------------------
 
 class EventStatus(str, Enum):
-    NEW = "NEW"
-    RUNNING = "RUNNING"
-    WAITING = "WAITING"   # z.B. wartet auf SSH confirm
-    DONE = "DONE"
-    FAILED = "FAILED"
-    TIMEOUT = "TIMEOUT"
+    NEW = "NEW"             # Neuer Event, noch nicht bearbeitet
+    RUNNING = "RUNNING"     # Alarm ausgelöst auf Telecare-Seite - warte auf Quittierung
+    WAITING = "WAITING"     # wartet auf SSH confirm von Telecare
+    DONE = "DONE"           # erfolgreich abgeschlossen - Quittiert
+    FAILED = "FAILED"       # Fehlgeschlagen - z.B. Quittierung nicht erfolgt oder Fehler in der Verarbeitung
+    TIMEOUT = "TIMEOUT"     # Timeout - z.B. Quittierung nicht erfolgt innerhalb von X Minuten
 
 
 
@@ -30,7 +30,7 @@ class User(Base):
         autoincrement=True,
     )
 
-    user_name: Mapped[str] = mapped_column(
+    username: Mapped[str] = mapped_column(
         String(100),
         unique=True,
         index=True,
@@ -109,9 +109,9 @@ class Event(Base):
     updated_at = Column(DateTime, nullable=False, default=datetime.utcnow)
 
     # Qumea-spezifische Felder (optional, je nach Event-Typ)
-    qumea_roomId = Column(Integer, nullable=True)
-    qumea_alertType = Column(Integer, nullable=True)
-    qumea_activeAlertId = Column(String(64), nullable=False, index=True)
+    qumea_roomId = Column(String(32), nullable=True)
+    qumea_alertType = Column(String(32), nullable=True)
+    qumea_activeAlertId = Column(Integer, nullable=False, index=True)
 
     __table_args__ = (
         Index("ix_events_room_alert_status", "room_name", "qumea_alertType", "status"),

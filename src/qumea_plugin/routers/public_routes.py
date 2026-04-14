@@ -1,6 +1,5 @@
 import logging
 from fastapi import APIRouter
-from datetime import datetime, timezone
 from .. import __version__
 
 logger = logging.getLogger(__name__)

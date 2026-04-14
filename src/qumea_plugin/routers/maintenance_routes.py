@@ -47,7 +47,7 @@ LOG_FILE = LOG_PATH / settings.log_file
 ###### System ######-----------------------------------------------------------------------------------
 @router.post("/restart")
 def restart(user=Depends(get_current_user)):
-    logger.warning("SYSTEM REBOOT requested by %s", getattr(user, "user_name", "unknown"))
+    logger.warning("SYSTEM REBOOT requested by %s", getattr(user, "username", "unknown"))
     python = sys.executable
     os.execl(python, python, *sys.argv)
 

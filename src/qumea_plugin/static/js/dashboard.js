@@ -134,7 +134,7 @@ function getHealth(manual = false) {
 }
 
 function get_active_events() {
-  authFetch("/api/event", {
+  authFetch("/api/event/events", {
     method: "GET"
   })
     .then(res => res.json())

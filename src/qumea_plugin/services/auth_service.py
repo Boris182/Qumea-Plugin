@@ -21,13 +21,13 @@ def get_user_from_token(
 
     try:
         payload = decode_token(token=raw_token, secret=secret, algorithm=algorithm)
-        user_name: str | None = payload.get("sub")
-        if not user_name:
+        username: str | None = payload.get("sub")
+        if not username:
             raise credentials_exception
     except JWTError:
         raise credentials_exception
 
-    user = db.query(User).filter(User.user_name == user_name).first()
+    user = db.query(User).filter(User.username == username).first()
     if not user:
         raise credentials_exception
 

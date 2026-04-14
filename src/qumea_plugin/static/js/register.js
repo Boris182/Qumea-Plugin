@@ -49,7 +49,7 @@ document.addEventListener('DOMContentLoaded', () => {
       // Wenn alles passt → registrieren
       console.log("Formular gültig, absenden...");
       const data = {
-      user_name: document.getElementById('user_name').value.trim(),
+      username: document.getElementById('username').value.trim(),
       password: document.getElementById('password').value,
     };
     register(data);

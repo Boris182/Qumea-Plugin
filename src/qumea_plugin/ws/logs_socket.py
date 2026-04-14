@@ -12,7 +12,6 @@ router = APIRouter()
 settings = get_settings()
 logger = logging.getLogger(__name__)
 
-# Besser: Logfile-Pfad aus deinen Settings ableiten (wenn du log_dir/log_file hast)
 LOG_PATH = Path(getattr(settings, "log_dir", "logs")) / getattr(settings, "log_file", "app.log")
 
 
@@ -23,10 +22,8 @@ async def websocket_log_stream(
     db: Session = Depends(get_db),
 ):
     try:
-        # 1) JWT-Secret aus app.state (wird in lifespan gesetzt)
         secret = websocket.app.state.jwt_secret
 
-        # 2) User aus Token holen (DB + JWT verify)
         user = get_user_from_token(
             raw_token=token,
             db=db,
@@ -34,11 +31,10 @@ async def websocket_log_stream(
             algorithm=settings.jwt_alg,
         )
 
-        # 3) Optional: nur Admin darf Logs streamen
         require_role(user, "admin")
 
         await websocket.accept()
-        logger.info("WS logs connected: user=%s", user.user_name)
+        logger.info("WS logs connected: user=%s", user.username)
 
         await send_log_tail(websocket)
 
@@ -61,7 +57,6 @@ async def send_log_tail(websocket: WebSocket):
 
         current_size = LOG_PATH.stat().st_size
         if current_size > last_size:
-            # robust gegen Encoding-Probleme:
             with LOG_PATH.open("r", encoding="utf-8", errors="replace") as f:
                 f.seek(last_size)
                 new_data = f.read()

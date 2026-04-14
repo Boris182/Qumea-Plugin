@@ -1,13 +1,15 @@
+from unittest.mock import Base
+from datetime import datetime
 from pydantic import BaseModel, Field
 from typing import Dict, Optional, Any, List
 from pydantic import ConfigDict
 
 class UserLogin(BaseModel):
-    user_name: str
+    username: str
     password: str
 
 class UserRegister(BaseModel):
-    user_name: str = Field(min_length=3, max_length=100)
+    username: str = Field(min_length=3, max_length=100)
     password: str = Field(min_length=8)
 
 class TokenResponse(BaseModel):
@@ -65,8 +67,17 @@ class addRoomDto(BaseModel):
     ascom_device_id: str
 
 class EventDto(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: int
     room_name: str
-    qumea_alertType: str
     status: str
-    created_at: str
+    created_at: datetime
+    updated_at: datetime
+    qumea_roomId: Optional[str] = None
+    qumea_alertType: Optional[str] = None
+    qumea_activeAlertId: str
+    
+
+
+
