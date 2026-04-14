@@ -26,27 +26,6 @@ def register(user: UserRegister, db: Session = Depends(get_db)):
     db.refresh(db_user)
     return JSONResponse(status_code=201, content={"message": "Registrierung erfolgreich"})
 
-@router.post("/login")
-def login(user: UserLogin, request: Request, db: Session = Depends(get_db)):
-
-    db_user = db.query(User).filter(User.user_name == user.user_name).first()
-
-    if not db_user or not verify_password(form_data.password, db_user.hashed_password):
-        raise HTTPException(
-            status_code=401,
-            detail="Ungültige Anmeldedaten",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-
-    token = create_access_token(
-        subject=db_user.username,
-        secret=request.app.state.jwt_secret,
-        algorithm=settings.jwt_alg,
-        expires_minutes=settings.jwt_expire_min,
-    )
-
-    return {"access_token": token, "token_type": "bearer"}
-"""
 
 @router.post("/login")
 def login(
