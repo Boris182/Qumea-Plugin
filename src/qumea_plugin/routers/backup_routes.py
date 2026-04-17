@@ -62,12 +62,12 @@ def format_size(bytes_size: int) -> str:
 ### Create Backup ###
 @router.get("/db/backup", description="Erstellt ein lokales Backup der SQLite-Datenbank")
 def db_backup(user=Depends(get_current_user)):
-    db_file = Path("./database/app.db")
+    db_file = Path("./data/database/app.db")
     if not db_file.exists():
         logger.info(f"SQLite DB nicht gefunden")
         raise HTTPException(status_code=500, detail="app.db nicht gefunden")
 
-    backup_path = Path("backup")
+    backup_path = Path("data/backup")
     backup_path.mkdir(parents=True, exist_ok=True)
 
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -87,8 +87,8 @@ def db_backup(user=Depends(get_current_user)):
 ### Zeige Backup Status###
 @router.get("/db/status", description="Check the status of the SQLite database.")
 def db_status(user=Depends(get_current_user)):
-    db_file = Path("./database/app.db")
-    backup_dir = Path("./backup")
+    db_file = Path("./data/database/app.db")
+    backup_dir = Path("./data/backup")
     backup_files = list(backup_dir.glob("app_backup_*.db"))
 
     if not db_file.exists():
@@ -119,12 +119,12 @@ def db_status(user=Depends(get_current_user)):
 ### Download verschlüsseltes Backup ###
 @router.post("/db/backup", description="Erstellt ein verschlüsseltes Backup der SQLite-Datenbank und liefert die .db.enc-Datei.")
 def db_backup(req: BackupRequest = Body(...), user=Depends(get_current_user)):
-    db_file = Path("./database/app.db")
+    db_file = Path("./data/database/app.db")
     if not db_file.exists():
         logger.info("SQLite DB nicht gefunden")
         raise HTTPException(status_code=500, detail="app.db nicht gefunden")
 
-    backup_path = Path("backup")
+    backup_path = Path("data/backup")
     backup_path.mkdir(parents=True, exist_ok=True)
 
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -173,12 +173,12 @@ async def restore_backup(
     password: str | None = Form(None),
     user=Depends(get_current_user),
 ):
-    db_file = Path("./database/app.db")
+    db_file = Path("./data/database/app.db")
     if not db_file.exists():
         logger.info("SQLite DB nicht gefunden")
         raise HTTPException(status_code=500, detail="app.db nicht gefunden")
 
-    backup_path = Path("backup")
+    backup_path = Path("data/backup")
     backup_path.mkdir(parents=True, exist_ok=True)
 
     try:

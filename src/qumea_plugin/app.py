@@ -1,20 +1,19 @@
 import os
 import json
 import logging
-import secrets
 from pathlib import Path
 from . import __version__
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import RedirectResponse, FileResponse
+from fastapi.responses import RedirectResponse
 from contextlib import asynccontextmanager
 from .routers import public_routes, auth_routes, backup_routes, maintenance_routes, service_routes, config_routes, room_routes, event_routes
 from .logging_conf import setup_logging
 from .config import get_settings
 from .db.database import engine, Base, SessionLocal
-from .db import models
 from .db.crud import config as config_crud
 from .ws import logs_socket
+from .security import get_or_create_jwt_secret
 from .services.runtime.context import RuntimeContext
 from .services.runtime.manager import ServiceManager
 from .services.http.client import create_http_client
@@ -24,8 +23,8 @@ from .services.service_config_defaults import DEFAULT_HTTP_CONFIG, DEFAULT_SERVI
 logger = logging.getLogger(__name__)
 
 # Verzeichnisse anlegen
-database_dir = "database"
-backup_dir = "backup"
+database_dir = "data/database"
+backup_dir = "data/backup"
 os.makedirs(database_dir, exist_ok=True)
 os.makedirs(backup_dir, exist_ok=True)
 
@@ -36,16 +35,12 @@ def create_app() -> FastAPI:
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
-        # Starte Logger
         logger.info("Startup: %s v%s", settings.app_name, __version__)
 
-        # Generiere ein geheimes JWT-Secret für die Laufzeit
-        app.state.jwt_secret = secrets.token_urlsafe(64)
+        app.state.jwt_secret = get_or_create_jwt_secret()
 
-        # Datenbank-Tabellen erstellen
         Base.metadata.create_all(bind=engine)
-        
-        # Lade HTTP-Konfiguration aus der Datenbank
+
         raw_http_cfg = None
         db = SessionLocal()
         try:
@@ -60,7 +55,6 @@ def create_app() -> FastAPI:
             except json.JSONDecodeError:
                 http_cfg = DEFAULT_HTTP_CONFIG.copy()
         
-        # Lade Service-Konfiguration aus der Datenbank
         raw_service_cfg = None
         db = SessionLocal()
         try:

@@ -24,6 +24,10 @@ def create_room(db: Session, *, room_name: str, ascom_device_id: str) -> Room:
     db.refresh(room)
     return room
 
+def create_rooms(db: Session, *, rooms: list[Room]) -> list[Room]:
+    db.bulk_save_objects(rooms)
+    db.commit()
+    return rooms
 
 def update_room(
     db: Session,
@@ -51,5 +55,10 @@ def delete_room(db: Session, room_id: int) -> bool:
     if not room:
         return False
     db.delete(room)
+    db.commit()
+    return True
+
+def delete_all_rooms(db: Session) -> bool:
+    db.query(Room).delete(synchronize_session=False)
     db.commit()
     return True

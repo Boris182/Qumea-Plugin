@@ -194,9 +194,9 @@ cython_debug/
 .cursorignore
 .cursorindexingignore
 
-# Backups, Logs und Scripts
+# Backups, Logs, Secrets and Scripts
 *.db
 *.enc
 *.tar
-/logs/*
-/scripts/*
+*.pem
+/data/*

@@ -32,7 +32,7 @@ class MqttConfig:
     
     @property
     def resolve_in_topic(self) -> str:
-        return f"qumea/tenant/{self.tenant_id}/public/v1/room/+/alert/+/resolved"
+        return f"qumea/tenant/{self.tenant_id}/public/v1/alert/+/resolved"
 
     @property
     def keepalive_in_topic(self) -> str:
@@ -75,6 +75,7 @@ class MqttWorker:
                 }
             )
             topic = self.cfg.keepalive_out_topic
+            logger.debug(f"Send Keepalive with payload: {payload}")
             self._client.publish(topic, payload=payload)
 
     # Sende Quittierung auf Event Topic

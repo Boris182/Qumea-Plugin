@@ -1,6 +1,5 @@
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
         env_file=".env",
@@ -20,7 +19,7 @@ class Settings(BaseSettings):
 
     # ---- Logging ----
     log_level: str = "INFO"
-    log_dir: str = "logs"
+    log_dir: str = "data/logs"
     log_file: str = "app.log"
     log_max_bytes: int = 1_000_000
     log_backup_count: int = 5
@@ -28,7 +27,7 @@ class Settings(BaseSettings):
     
 
     # ---- Database ----
-    db_path: str = "database/app.db"
+    db_path: str = "data/database/app.db"
 
     # ---- JWT ----
     jwt_alg: str = "HS256"

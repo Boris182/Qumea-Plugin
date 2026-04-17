@@ -11,12 +11,13 @@ from .database import Base
 # -------------------------
 
 class EventStatus(str, Enum):
-    NEW = "NEW"             # Neuer Event, noch nicht bearbeitet
-    RUNNING = "RUNNING"     # Alarm ausgelöst auf Telecare-Seite - warte auf Quittierung
-    WAITING = "WAITING"     # wartet auf SSH confirm von Telecare
-    DONE = "DONE"           # erfolgreich abgeschlossen - Quittiert
-    FAILED = "FAILED"       # Fehlgeschlagen - z.B. Quittierung nicht erfolgt oder Fehler in der Verarbeitung
-    TIMEOUT = "TIMEOUT"     # Timeout - z.B. Quittierung nicht erfolgt innerhalb von X Minuten
+    NEW = "NEW"                                     # Neuer Event, noch nicht bearbeitet
+    WAITING_SSH_CONFIRM = "WAITING_SSH_CONFIRM"     # wartet auf SSH confirm von Telecare
+    RUNNING = "RUNNING"                             # Alarm ausgelöst auf Telecare-Seite - warte auf Quittierung
+    WAITING_MQTT_RESOLVE = "WAITING_MQTT_RESOLVE"   # wartet auf MQTT Resolve von Qumea
+    DONE = "DONE"                                   # erfolgreich abgeschlossen - Quittiert
+    FAILED = "FAILED"                               # Fehlgeschlagen - z.B. Quittierung nicht erfolgt oder Fehler in der Verarbeitung
+    TIMEOUT = "TIMEOUT"                             # Timeout - z.B. Quittierung nicht erfolgt innerhalb von X Minuten
 
 
 
@@ -112,6 +113,7 @@ class Event(Base):
     qumea_roomId = Column(String(32), nullable=True)
     qumea_alertType = Column(String(32), nullable=True)
     qumea_activeAlertId = Column(Integer, nullable=False, index=True)
+    quema_resolverName = Column(String(32), nullable=True)
 
     __table_args__ = (
         Index("ix_events_room_alert_status", "room_name", "qumea_alertType", "status"),

@@ -26,9 +26,10 @@ const token = localStorage.getItem("auth_token");
 }
 // 3. WebSocket-Stream-Funktion mit Token in URL
 function startLogWebSocket() {
-    const logBox = document.getElementById("logOutput");
+const logBox = document.getElementById("logOutput");
 const token = localStorage.getItem("auth_token");
-  const ws = new WebSocket("ws://" + location.host + "/ws/logs?token=" + token);
+const protocol = location.protocol === "https:" ? "wss" : "ws";
+  const ws = new WebSocket(protocol + "://" + location.host + "/ws/logs?token=" + token);
 
   ws.onmessage = function(event) {
     logBox.textContent += event.data;
