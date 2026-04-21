@@ -21,7 +21,7 @@ class MqttConfig:
     client_id: str
     integrationId: str
     events_to_handle: dict | None
-
+    
     @property
     def alert_in_topic(self) -> str:
         return f"qumea/tenant/{self.tenant_id}/public/v1/alert/+/type/+"
@@ -37,7 +37,24 @@ class MqttConfig:
     @property
     def keepalive_in_topic(self) -> str:
         return f"qumea/tenant/{self.tenant_id}/public/v1/alive"
+    """
 
+    @property
+    def alert_in_topic(self) -> str:
+        return f"qumea/tenant/{self.tenant_id}/public/v1/room/f4bbc02e-e1c9-4490-9d91-5e942f0aaf17/alert/fall"
+    
+    @property
+    def confirm_in_topic(self) -> str:
+        return f"qumea/tenant/{self.tenant_id}/public/v1/room/f4bbc02e-e1c9-4490-9d91-5e942f0aaf17/alert/confirm/+"
+    
+    @property
+    def resolve_in_topic(self) -> str:
+        return f"qumea/tenant/{self.tenant_id}/public/v1/room/f4bbc02e-e1c9-4490-9d91-5e942f0aaf17/alert/+/resolved"
+
+    @property
+    def keepalive_in_topic(self) -> str:
+        return f"qumea/tenant/{self.tenant_id}/public/v1/alive"
+    """
     @property
     def keepalive_out_topic(self) -> str:
         return f"qumea/tenant/{self.tenant_id}/public/v1/integration/{self.integrationId}/alive"
@@ -106,6 +123,7 @@ class MqttWorker:
         self._client = client
 
         if self.cfg.username:
+            logger.info("Using MQTT authentication with username=%s and PW=%s", self.cfg.username, self.cfg.password)
             client.username_pw_set(self.cfg.username, self.cfg.password)
 
         client.tls_set(cert_reqs=ssl.CERT_REQUIRED)
@@ -200,13 +218,17 @@ class MqttWorker:
             self.cfg.client_id,
         )
 
-        client.connect(
-            host=self.cfg.host,          # nur mqtt.qumea.cloud
-            port=self.cfg.port,          # 8883
-            keepalive=60,                # wie Node-RED
-            clean_start=True,            # "Bereinigter Start"
-            properties=connect_props,
-        )
+        try:
+            client.connect(
+                host=self.cfg.host,
+                port=self.cfg.port,
+                keepalive=60,
+                clean_start=True,
+                properties=connect_props,
+            )
+        except Exception as e:
+            logger.error("MQTT connection failed: %s", e)
+            return
 
         client.loop_start()
         await self._stop.wait()

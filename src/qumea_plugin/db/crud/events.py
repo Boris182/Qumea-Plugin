@@ -6,7 +6,7 @@ from sqlalchemy import and_
 from ..models import Event, EventStatus
 
 def list_events(db: Session) -> list[Event]:
-    return db.query(Event).filter(Event.status != EventStatus.DONE).all()
+    return db.query(Event).filter(Event.status != EventStatus.DONE.value).all()
 
 
 def get_event(db: Session, event_id: int) -> Event | None:

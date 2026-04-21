@@ -153,15 +153,35 @@ class ServiceManager:
         baseURL = ctx.http.base_url
         ascom_id = None
 
-        def send_http_alert_request(event):
-            success = ctx.http.get(f"{baseURL}/sendUCM?ascom_id={ascom_id}", timeout=5.0)
+        async def send_http_alert_request(event):
+            alert_type = event.get("alertType")
+            alertMonitoringStage = event.get("alertMonitoringStage")
+
+            dest_alert_number_fall = "600"
+            dest_alert_number_bed = "601"
+            dest_alert_number_no_return = "602"
+            dest_number = ""
+
+            if alert_type == "FALL":
+                dest_number = dest_alert_number_fall
+            elif alert_type == "BED":
+                if alertMonitoringStage == "NO_BED_RETURN":
+                    dest_number = dest_alert_number_no_return
+                else:
+                    dest_number = dest_alert_number_bed
+            else:
+                logger.warning(f"Unknown alert type: {alert_type}")
+                return False
+
+
+            success = ctx.http.get(f"{baseURL}?no={dest_number}&msg={ascom_id}", timeout=5.0)
             if success:
                 return True
             else:
                 return False
             
 
-        def handle_alert(event):
+        async def handle_alert(event):
             try:
                 room: Room | None = db.query(Room).filter(Room.room_name == event.get("roomName")).first()
                 if not room:
@@ -254,11 +274,11 @@ class ServiceManager:
                         return
 
 
-                    if existing_open_event(Event.status) == EventStatus.NEW.value:
-                        request = send_http_alert_request(event=event)
+                    if existing_open_event.status == EventStatus.NEW.value:
+                        request = await send_http_alert_request(event=event)
                     
-                    elif existing_open_event(Event.status) == EventStatus.WAITING_SSH_CONFIRM.value:
-                        request = send_http_alert_request(event=event)
+                    elif existing_open_event.status == EventStatus.WAITING_SSH_CONFIRM.value:
+                        request = await send_http_alert_request(event=event)
                     
                     else:
                         logger.debug(f"Alert already created in Telecare for Device: {ascom_id}")
@@ -276,7 +296,7 @@ class ServiceManager:
             db.commit()
 
 
-        def handle_confirm(event):
+        async def handle_confirm(event):
             logger.debug("Handle Confirm Event")
             active_alert_id = event.get("activeAlertId")
             try:
@@ -309,7 +329,7 @@ class ServiceManager:
             except Exception:
                 logger.exception(Exception)
 
-        def handle_resolved(event):
+        async def handle_resolved(event):
             logger.debug("Handle Resolve Event")
             active_alert_id = event.get("activeAlertId")
             try:
@@ -355,7 +375,7 @@ class ServiceManager:
         handler = handlers.get(msg_type)
         if handler:
             # start specific handler from handlers
-            handler(event)
+            await handler(event)
         else:
             logger.debug(f"Unknown event type: {msg_type}")
         
@@ -546,8 +566,9 @@ class ServiceManager:
 
             # --- 60s Task ---
             if (now - last_60s_task) > 60.0:
+                issues = []
                 try:
-                    self._mqtt.publish_integration_keepalive()
+                    self._mqtt.publish_integration_keepalive(issueActive=False, issues=issues)
                 except Exception as e:
                     self.status.last_error = str(e)
                 last_60s_task = now

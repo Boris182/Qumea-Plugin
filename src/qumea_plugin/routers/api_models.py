@@ -76,7 +76,7 @@ class EventDto(BaseModel):
     updated_at: datetime
     qumea_roomId: Optional[str] = None
     qumea_alertType: Optional[str] = None
-    qumea_activeAlertId: str
+    qumea_activeAlertId: int
     
 
 
