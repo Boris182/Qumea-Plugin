@@ -18,7 +18,7 @@ class Settings(BaseSettings):
     port: int = 8000
 
     # ---- Logging ----
-    log_level: str = "INFO"
+    log_level: str = "DEBUG"
     log_dir: str = "data/logs"
     log_file: str = "app.log"
     log_max_bytes: int = 1_000_000
